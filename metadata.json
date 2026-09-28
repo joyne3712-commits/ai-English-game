@@ -1,0 +1,6 @@
+{
+  "name": "FluentTrip: 机场应急突围",
+  "description": "面向中国英语学习者的沉浸式情境英语冒险游戏。真实航班取消突发状况，从生存选择到地道自由对话，边玩边掌握实用英语沟通。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
