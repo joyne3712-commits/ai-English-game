@@ -41,7 +41,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
         {/* Item Grid & Detail Split */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Left: Items list */}
-          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-64 overflow-y-auto overscroll-contain touch-pan-y pr-1">
             {inventory.map((item) => {
               const isSelected = selectedItem?.id === item.id;
               return (

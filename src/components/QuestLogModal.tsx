@@ -61,7 +61,7 @@ export const QuestLogModal: React.FC<QuestLogModalProps> = ({
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
             任务目标清单：
           </span>
-          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-60 overflow-y-auto overscroll-contain touch-pan-y pr-1">
             {goals.map((goal) => {
               const isCompleted = goal.status === 'COMPLETED';
               const isActive = goal.status === 'ACTIVE';

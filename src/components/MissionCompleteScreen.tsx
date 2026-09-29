@@ -76,92 +76,92 @@ export const MissionCompleteScreen: React.FC<MissionCompleteScreenProps> = ({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto bg-[#0b101b] border-2 border-amber-500/80 rounded-3xl shadow-[0_25px_80px_rgba(245,158,11,0.25)] p-6 sm:p-8 space-y-6 animate-in zoom-in-95 duration-300 font-mono text-slate-100 select-none">
+    <div className="w-full max-w-4xl mx-auto bg-[#0b101b] border-2 border-amber-500/80 rounded-3xl shadow-[0_25px_80px_rgba(245,158,11,0.25)] p-4 sm:p-8 space-y-4 sm:space-y-6 animate-in zoom-in-95 duration-300 font-mono text-slate-100 my-auto">
       {/* 1. Header Fanfare & Chapter Victory Banner */}
-      <div className="text-center space-y-3 pb-6 border-b border-slate-800 relative">
-        <div className="inline-flex p-3 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-400/50 shadow-[0_0_30px_rgba(245,158,11,0.3)] animate-bounce-short">
-          <Trophy className="w-10 h-10" />
+      <div className="text-center space-y-2 sm:space-y-3 pb-4 sm:pb-6 border-b border-slate-800 relative">
+        <div className="inline-flex p-2.5 sm:p-3 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-400/50 shadow-[0_0_30px_rgba(245,158,11,0.3)] animate-bounce-short">
+          <Trophy className="w-8 h-8 sm:w-10 sm:h-10" />
         </div>
-        <div className="text-xs font-mono text-amber-400 uppercase tracking-widest">
+        <div className="text-[10px] sm:text-xs font-mono text-amber-400 uppercase tracking-widest">
           NINGBO ➔ TOKYO ➔ SAN FRANCISCO · MISSION COMPLETE
         </div>
-        <h1 className="text-3xl sm:text-5xl font-black text-white tracking-wider">
+        <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-white tracking-wider">
           CHAPTER 01 · THE CONNECTION
         </h1>
-        <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto leading-relaxed font-sans font-medium">
+        <p className="text-xs sm:text-base text-slate-300 max-w-xl mx-auto leading-relaxed font-sans font-medium">
           🎉 恭喜！你独自一人在东京成功应对了国际航班突发取消、备选航班抉择、行李直挂确认与登机牌故障，顺利登上了飞往旧金山的客机！
         </p>
 
         {/* Stats Grid */}
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
-          <div className="px-4 py-2 rounded-2xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs">
-            <Sparkles className="w-4 h-4 text-amber-400" />
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 pt-2 sm:pt-3">
+          <div className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs">
+            <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
             <span className="text-slate-400">旅行经验:</span>
-            <span className="text-base font-bold text-amber-300">+{xp} XP</span>
+            <span className="text-sm sm:text-base font-bold text-amber-300">+{xp} XP</span>
           </div>
 
-          <div className="px-4 py-2 rounded-2xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs">
-            <Coins className="w-4 h-4 text-emerald-400" />
+          <div className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs">
+            <Coins className="w-4 h-4 text-emerald-400 shrink-0" />
             <span className="text-slate-400">剩余资金:</span>
-            <span className="text-base font-bold text-emerald-300">${money}</span>
+            <span className="text-sm sm:text-base font-bold text-emerald-300">${money}</span>
           </div>
 
-          <div className="px-4 py-2 rounded-2xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs">
+          <div className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs">
             <span className="text-slate-400">精力值:</span>
-            <span className="text-base font-bold text-rose-400">{hp}%</span>
+            <span className="text-sm sm:text-base font-bold text-rose-400">{hp}%</span>
           </div>
         </div>
       </div>
 
       {/* 2. Your Travel Decision Log (Sims-style choices summary) */}
-      <div className="p-5 rounded-2xl bg-gradient-to-r from-sky-950/80 via-slate-900 to-indigo-950/80 border border-sky-500/50 shadow-xl space-y-3">
-        <div className="flex items-center justify-between border-b border-sky-800/40 pb-2 text-xs">
+      <div className="p-3.5 sm:p-5 rounded-2xl bg-gradient-to-r from-sky-950/80 via-slate-900 to-indigo-950/80 border border-sky-500/50 shadow-xl space-y-2 sm:space-y-3">
+        <div className="flex items-center justify-between border-b border-sky-800/40 pb-2 text-[11px] sm:text-xs">
           <span className="px-2.5 py-0.5 rounded-full bg-sky-600 text-white font-bold tracking-wider">
             YOUR TRIP SUMMARY · 行程抉择回顾
           </span>
-          <span className="text-sky-300">UNITED AIRLINES ➔ SFO</span>
+          <span className="text-sky-300 hidden xs:inline">UNITED AIRLINES ➔ SFO</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
-          <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 pt-1 text-xs">
+          <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-0.5">
             <div className="text-[10px] text-slate-400 uppercase">Selected Flight</div>
-            <div className="text-sm font-bold text-amber-300">{selectedFlightName}</div>
+            <div className="text-xs sm:text-sm font-bold text-amber-300">{selectedFlightName}</div>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+          <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-0.5">
             <div className="text-[10px] text-slate-400 uppercase">Assigned Seat</div>
-            <div className="text-sm font-bold text-emerald-400">
+            <div className="text-xs sm:text-sm font-bold text-emerald-400">
               {isWindowSeat ? 'Seat 14A (Window · Pacific View)' : isAisleSeat ? 'Seat 14C (Aisle · Easy Legroom)' : 'Seat 14A (Confirmed)'}
             </div>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+          <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-0.5">
             <div className="text-[10px] text-slate-400 uppercase">Baggage & Hotel</div>
-            <div className="text-sm font-bold text-sky-300">Auto-Transfer / Sunset Hotel</div>
+            <div className="text-xs sm:text-sm font-bold text-sky-300">Auto-Transfer / Sunset Hotel</div>
           </div>
         </div>
       </div>
 
       {/* 3. Expressions Unlocked in Phrasebook */}
-      <div className="space-y-3">
+      <div className="space-y-2.5 sm:space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
-            <Bookmark className="w-4 h-4" />
-            <span>✈️ 本章旅行生存短语录 (Travel Expressions Archive) ({expressionsMastered.length})</span>
+          <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-bold text-amber-400 uppercase tracking-wider">
+            <Bookmark className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span>✈️ 本章旅行生存短语录 ({expressionsMastered.length})</span>
           </div>
-          <span className="text-xs text-slate-400">点击 🔊 听地道发音</span>
+          <span className="text-[10px] sm:text-xs text-slate-400">点击 🔊 听发音 · 上下滑动查看全部</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 max-h-72 sm:max-h-60 overflow-y-auto overscroll-contain pr-1 touch-pan-y">
           {expressionsMastered.map((exp, idx) => {
             const isPlaying = playingPhrase === exp.en;
             return (
               <div
                 key={idx}
-                className="p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors flex items-start justify-between gap-3 group"
+                className="p-2.5 sm:p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors flex items-start justify-between gap-2.5 sm:gap-3 group"
               >
-                <div className="space-y-1 flex-1">
-                  <div className="text-xs sm:text-sm font-bold text-white leading-snug">
+                <div className="space-y-1 flex-1 min-w-0">
+                  <div className="text-xs sm:text-sm font-bold text-white leading-snug break-words">
                     "{exp.en}"
                   </div>
                   <div className="text-xs text-sky-300 font-sans font-medium">{exp.cn}</div>
@@ -169,7 +169,7 @@ export const MissionCompleteScreen: React.FC<MissionCompleteScreenProps> = ({
 
                 <button
                   onClick={() => handleSpeak(exp.en)}
-                  className={`p-2 rounded-xl border shrink-0 transition-colors cursor-pointer ${
+                  className={`p-2 rounded-xl border shrink-0 transition-colors cursor-pointer touch-manipulation ${
                     isPlaying
                       ? 'bg-amber-400 text-slate-950 border-amber-300'
                       : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800'
@@ -186,13 +186,13 @@ export const MissionCompleteScreen: React.FC<MissionCompleteScreenProps> = ({
       </div>
 
       {/* 4. Action Buttons (Replay, Sneak Peek Chapter 2, Next Chapter) */}
-      <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+      <div className="pt-3 sm:pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
         <button
           onClick={() => {
             sound.playClick();
             onRestart();
           }}
-          className="px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs sm:text-sm font-bold tracking-wider uppercase transition-all flex items-center gap-2 border border-slate-700 cursor-pointer"
+          className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 sm:py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs sm:text-sm font-bold tracking-wider uppercase transition-all flex items-center justify-center gap-2 border border-slate-700 cursor-pointer touch-manipulation"
         >
           <RotateCcw className="w-4 h-4" />
           <span>PLAY CHAPTER 01 AGAIN</span>
@@ -203,9 +203,9 @@ export const MissionCompleteScreen: React.FC<MissionCompleteScreenProps> = ({
             sound.playItemGet();
             setShowChapter2Preview(true);
           }}
-          className="px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 active:scale-95 text-slate-950 font-black text-xs sm:text-sm tracking-wider uppercase transition-all flex items-center gap-2 shadow-[0_10px_25px_rgba(245,158,11,0.35)] cursor-pointer"
+          className="w-full sm:w-auto min-h-[44px] px-6 py-2.5 sm:py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 active:scale-95 text-slate-950 font-black text-xs sm:text-sm tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-[0_10px_25px_rgba(245,158,11,0.35)] cursor-pointer touch-manipulation"
         >
-          <span>PREVIEW CHAPTER 02: THE WRONG HOTEL</span>
+          <span>PREVIEW CHAPTER 02</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

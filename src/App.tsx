@@ -781,7 +781,7 @@ export default function App() {
       {/* 5. MAIN VIEWPORT: PIXEL ART GAMEPLAY OR VICTORY SCREEN */}
       <main className="relative flex-1 w-full h-full overflow-hidden flex items-center justify-center">
         {isMissionComplete ? (
-          <div className="w-full h-full overflow-y-auto p-4 flex items-center justify-center z-40 animate-in zoom-in-95 duration-500">
+          <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-slate-950/95 p-3 sm:p-6 flex flex-col items-center justify-start sm:justify-center animate-in zoom-in-95 duration-500 touch-pan-y">
             <MissionCompleteScreen
               score={100}
               xp={xp}

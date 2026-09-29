@@ -293,7 +293,7 @@ export const RpgDialogueBox: React.FC<RpgDialogueBoxProps> = ({
 
   return (
     <div
-      className="w-full bg-[#080d1a]/98 border-2 border-slate-600 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.95)] p-3.5 sm:p-5 backdrop-blur-xl relative overflow-hidden transition-all duration-200 text-slate-100 max-h-[46vh] sm:max-h-[50vh] flex flex-col justify-between"
+      className="w-full bg-[#080d1a]/98 border-2 border-slate-600 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.95)] p-3 sm:p-5 backdrop-blur-xl relative overflow-hidden transition-all duration-200 text-slate-100 max-h-[68vh] sm:max-h-[52vh] flex flex-col justify-between"
       style={{
         boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(245, 158, 11, 0.25)',
       }}
@@ -486,7 +486,7 @@ export const RpgDialogueBox: React.FC<RpgDialogueBoxProps> = ({
               </button>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 max-h-[38vh] sm:max-h-56 overflow-y-auto overscroll-contain touch-pan-y pr-1">
               {displayedOptions.map((option, idx) => {
                 const isSelected = selectedChoiceIdx === idx;
                 const optionLetter = ['A', 'B', 'C', 'D', 'E'][idx] || `${idx + 1}`;
