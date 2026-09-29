@@ -34,34 +34,36 @@ export const MissionCompleteScreen: React.FC<MissionCompleteScreenProps> = ({
 
   const expressionsMastered = [
     {
-      en: "My connecting flight was cancelled.",
-      cn: "我的转机航班被取消了。",
-      note: "地勤柜台沟通的核心起手句，快速说明自身遭遇",
+      en: "My connecting flight was cancelled. Could you help me rebook?",
+      cn: "我的转机航班被取消了，能帮我安排改签吗？",
     },
     {
-      en: "What are my options for rebooking?",
-      cn: "请问改签有哪些备选航班？",
-      note: "差旅必备，索取航司所有可用的替代航线",
+      en: "What are my options for reaching San Francisco tonight?",
+      cn: "请问今晚还有哪些飞往旧金山的备选航班？",
     },
     {
-      en: "What's the difference between the two flights?",
-      cn: "这两趟备选航班有什么区别？",
-      note: "权衡时间宽裕度与目的地到达时间的实用对比句",
+      en: "Will my checked baggage be transferred automatically?",
+      cn: "我的托运行李会自动转运直挂到目的地吗？",
     },
     {
-      en: "Will my checked baggage transfer automatically?",
-      cn: "我的托运行李会自动转运直挂吗？",
-      note: "国际转机核心关切，确认中途是否需要取行李",
+      en: "Could I request an aisle or window seat on this flight?",
+      cn: "这班航班能帮我安排靠走道或靠窗的座位吗？",
     },
     {
-      en: "Could I get a coffee? What do you recommend?",
-      cn: "我能点杯咖啡吗？请问有什么推荐？",
-      note: "候机厅咖啡厅自由点单与破冰闲聊必备表达",
+      en: "Excuse me, where is Gate 18? Is boarding already starting?",
+      cn: "打扰一下，请问18号登机口怎么走？已经开始登机了吗？",
     },
     {
-      en: "Excuse me, my digital boarding pass isn't loading.",
-      cn: "打扰一下，我的电子登机牌加载不出来。",
-      note: "登机口遭遇 App 故障时，向登机口地勤求助打印纸质票",
+      en: "My digital boarding pass isn't scanning. Could you print a paper copy?",
+      cn: "我的手机电子登机牌扫不出来，能帮我打印一张纸质登机牌吗？",
+    },
+    {
+      en: "Are meal vouchers provided for this airline delay?",
+      cn: "由于航班延误，航司会提供机场餐饮抵用券吗？",
+    },
+    {
+      en: "What time does the boarding gate close?",
+      cn: "请问登机口最晚几点停止登机？",
     },
   ];
 
@@ -158,12 +160,11 @@ export const MissionCompleteScreen: React.FC<MissionCompleteScreenProps> = ({
                 key={idx}
                 className="p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors flex items-start justify-between gap-3 group"
               >
-                <div className="space-y-1">
+                <div className="space-y-1 flex-1">
                   <div className="text-xs sm:text-sm font-bold text-white leading-snug">
                     "{exp.en}"
                   </div>
                   <div className="text-xs text-sky-300 font-sans font-medium">{exp.cn}</div>
-                  <div className="text-[10px] text-slate-500 font-sans italic">{exp.note}</div>
                 </div>
 
                 <button

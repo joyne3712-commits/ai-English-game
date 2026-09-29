@@ -1,5 +1,10 @@
 // Web Audio API Synthesizer and Advanced NPC Conversational Voice Engine for FLUENT TRIP
 
+import { preprocessDialogueForTts } from './ttsPreprocessor';
+import { preprocessDialogue, stripSsmlTags } from '../utils/speechUtils';
+
+export { preprocessDialogueForTts, preprocessDialogue, stripSsmlTags };
+
 export interface VoiceProfile {
   characterId: string;
   name: string;
@@ -21,7 +26,7 @@ export const NPC_VOICE_PROFILES: Record<string, VoiceProfile> = {
     gender: 'female',
     ageRange: '25-30',
     personality: 'warm, professional, patient, calm under pressure',
-    basePitch: 1.04,
+    basePitch: 1.02,
     baseRate: 1.01,
     preferredVoices: [
       'Microsoft Jenny Online (Natural)',
@@ -139,8 +144,8 @@ export const NPC_VOICE_PROFILES: Record<string, VoiceProfile> = {
     gender: 'male',
     ageRange: '30-40',
     personality: 'calm, grounded, mature, practical, matter-of-fact, lower energy',
-    basePitch: 0.84,
-    baseRate: 0.92,
+    basePitch: 0.83,
+    baseRate: 0.91,
     preferredVoices: [
       'Microsoft David Online (Natural)',
       'Microsoft David',
@@ -160,8 +165,8 @@ export const NPC_VOICE_PROFILES: Record<string, VoiceProfile> = {
     gender: 'male',
     ageRange: '30-40',
     personality: 'calm, grounded, mature, practical, matter-of-fact, lower energy',
-    basePitch: 0.84,
-    baseRate: 0.92,
+    basePitch: 0.83,
+    baseRate: 0.91,
     preferredVoices: [
       'Microsoft David Online (Natural)',
       'Microsoft David',
@@ -189,53 +194,162 @@ export const NPC_VOICE_PROFILES: Record<string, VoiceProfile> = {
   },
 };
 
+export interface SpokenChunk {
+  text: string;
+  pitchOffset: number; // relative delta to base pitch (e.g. +0.05 for question, -0.03 for declarative cadence)
+  rateMultiplier: number; // tempo modifier (e.g. 0.94 for thought/filler, 1.08 for breezy reaction)
+  postPauseMs: number; // breath pause duration before following unit
+}
+
 /**
- * Naturalizes raw dialogue strings for authentic spoken prosody without altering display text.
- * Prevents mechanical reading of flight codes (e.g. UA921 -> U A 921), airport acronyms (SFO -> S F O),
- * and enhances conversational fillers with natural pauses.
+ * Normalizes conversational text for speech synthesis without changing display strings.
+ * Pronounces flight numbers, times, and airport codes naturally as native aviation staff do.
  */
 export function naturalizeConversationalProsody(text: string, personaId?: string): string {
   if (!text) return '';
+  return preprocessDialogueForTts(text, personaId);
+}
 
-  let spoken = text
-    .replace(/[*_#`~]/g, '') // remove markdown symbols
-    .replace(/\s+/g, ' ')
-    .trim();
+type ThoughtGroupIntent = 'PROCEDURAL_QUESTION' | 'BAD_NEWS' | 'HELPFUL_ACTION' | 'CONFIRMATION' | 'ROUTINE_INFO';
 
-  // 1. Naturalize Airline & Flight Codes (so TTS pronounces them as real flight calls)
-  spoken = spoken.replace(/\bUA\s*(\d{3,4})\b/gi, (_, num) => {
-    const spaced = num.split('').join(' ');
-    return `U A ${spaced}`;
-  });
+function classifyThoughtGroupIntent(text: string): ThoughtGroupIntent {
+  const lower = text.toLowerCase().trim();
+  if (
+    lower.endsWith('?') ||
+    lower.startsWith('may i') ||
+    lower.startsWith('could you') ||
+    lower.startsWith('which flight') ||
+    lower.startsWith('are you')
+  ) {
+    return 'PROCEDURAL_QUESTION';
+  }
+  if (
+    lower.includes('cancelled') ||
+    lower.includes('delay') ||
+    lower.includes('unfortunately') ||
+    lower.includes('equipment issue') ||
+    lower.includes('wrong gate') ||
+    lower.includes('late arrival')
+  ) {
+    return 'BAD_NEWS';
+  }
+  if (
+    lower.includes('let me') ||
+    lower.includes('i can find') ||
+    lower.includes('i can put you') ||
+    lower.includes('pull up your booking') ||
+    lower.includes('help you') ||
+    lower.includes('look at available')
+  ) {
+    return 'HELPFUL_ACTION';
+  }
+  if (
+    lower.includes('thank you') ||
+    lower.includes("you're all set") ||
+    lower.includes("you're confirmed") ||
+    lower.includes('got it') ||
+    lower.includes('have a safe flight') ||
+    lower.includes("you're welcome")
+  ) {
+    return 'CONFIRMATION';
+  }
+  return 'ROUTINE_INFO';
+}
 
-  // 2. Naturalize Airport / Gate Codes
-  spoken = spoken.replace(/\bSFO\b/g, 'S F O');
-  spoken = spoken.replace(/\bGate\s*([A-Za-z]?)(\d+)\b/gi, 'Gate $1 $2');
+/**
+ * Splits dialogue into workplace-authentic semantic thought groups with context-aware
+ * prosody, controlled pitch contours, and professional information-boundary pauses.
+ */
+export function buildProsodyChunks(text: string, personaId?: string): SpokenChunk[] {
+  const naturalText = preprocessDialogueForTts(text, personaId);
+  if (!naturalText) return [];
 
-  // 3. Conversational hesitation & natural phrase boundaries
-  // Inject micro-pauses for human conversational cadence
-  spoken = spoken
-    .replace(/\bUh\.\.\./gi, 'Uh, ')
-    .replace(/\bUm\.\.\./gi, 'Um, ')
-    .replace(/\bWait\.\.\./gi, 'Wait, ')
-    .replace(/\bYeah\.\.\./gi, 'Yeah, ')
-    .replace(/\bHonestly\?\b/gi, 'Honestly, ')
-    .replace(/\bOkay,\s*I think\b/gi, 'Okay, I think')
-    .replace(/\bGive me just a second\b/gi, 'Give me just a second');
+  const persona = (personaId || 'sarah').toLowerCase();
+  const chunks: SpokenChunk[] = [];
 
-  // Character specific rhythm tweaks
-  if (personaId === 'barista' || personaId === 'mike') {
-    // Mike has a breezy, slightly connected phrasing
-    spoken = spoken.replace(/!+/g, '! ');
-  } else if (personaId === 'staff_david' || personaId === 'david') {
-    // David has grounded, measured pauses between sentences
-    spoken = spoken.replace(/\.\s+/g, '. ');
-  } else if (personaId === 'agent_alex' || personaId === 'alex') {
-    // Alex has crisp, concise cadence
-    spoken = spoken.replace(/;\s*/g, '. ');
+  // Split by sentence boundaries while preserving conversational continuity
+  const sentences = naturalText.split(/(?<=[.?!])\s+/).filter(Boolean);
+
+  for (let sIdx = 0; sIdx < sentences.length; sIdx++) {
+    const rawSentence = sentences[sIdx].trim();
+    if (!rawSentence) continue;
+
+    const isLastSentence = sIdx === sentences.length - 1;
+
+    // Subdivide compound clauses by informational conjunctions if longer than 8 words
+    const words = rawSentence.split(/\s+/);
+    let subClauses: string[] = [rawSentence];
+
+    if (words.length > 8 && /,\s+(?:but|however|so|which|because|although)\s+/i.test(rawSentence)) {
+      subClauses = rawSentence.split(/,\s+(?=(?:but|however|so|which|because|although)\s+)/i);
+    }
+
+    for (let cIdx = 0; cIdx < subClauses.length; cIdx++) {
+      const clause = subClauses[cIdx].trim();
+      if (!clause) continue;
+
+      const isLastClause = cIdx === subClauses.length - 1;
+      const intent = classifyThoughtGroupIntent(clause);
+
+      let pitchOffset = 0.0;
+      let rateMultiplier = 1.0;
+      let postPauseMs = 110;
+
+      switch (intent) {
+        case 'PROCEDURAL_QUESTION':
+          pitchOffset = 0.035; // clean, professional rising inquiry contour
+          rateMultiplier = 1.03; // fluent workplace pace
+          postPauseMs = 120;
+          break;
+
+        case 'BAD_NEWS':
+          pitchOffset = -0.02; // composed, calm professional delivery
+          rateMultiplier = 0.98; // measured delivery for critical information
+          postPauseMs = 130;
+          break;
+
+        case 'HELPFUL_ACTION':
+          pitchOffset = 0.01; // subtle supportive clarity
+          rateMultiplier = 1.02; // fluid, competent action tempo
+          postPauseMs = 100;
+          break;
+
+        case 'CONFIRMATION':
+          pitchOffset = -0.02; // crisp settled completion
+          rateMultiplier = 1.06; // efficient workplace acknowledgment
+          postPauseMs = 80;
+          break;
+
+        case 'ROUTINE_INFO':
+        default:
+          pitchOffset = isLastClause && isLastSentence ? -0.015 : 0.005;
+          rateMultiplier = 1.01;
+          postPauseMs = isLastClause ? 120 : 90;
+          break;
+      }
+
+      // Persona nuance (subtle professional differentiation)
+      if (persona === 'agent_alex' || persona === 'alex') {
+        rateMultiplier *= 1.03; // Alex is crisp and focused on boarding flow
+        postPauseMs = Math.max(60, postPauseMs - 20);
+      } else if (persona === 'staff_david' || persona === 'david') {
+        rateMultiplier *= 0.96; // David is grounded, unhurried, experienced
+        postPauseMs += 25;
+      } else if (persona === 'barista' || persona === 'mike') {
+        rateMultiplier *= 1.02; // Mike is a slightly more relaxed workplace barista
+        postPauseMs = Math.max(70, postPauseMs - 15);
+      }
+
+      chunks.push({
+        text: clause,
+        pitchOffset,
+        rateMultiplier,
+        postPauseMs,
+      });
+    }
   }
 
-  return spoken;
+  return chunks;
 }
 
 class SoundService {
@@ -244,6 +358,8 @@ class SoundService {
   private cachedVoices: SpeechSynthesisVoice[] = [];
   private voiceMap: Map<string, SpeechSynthesisVoice> = new Map();
   private isVoicesInitialized: boolean = false;
+  private activeSpeechSessionId: number = 0;
+  private speechTimeoutHandles: number[] = [];
 
   constructor() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -252,6 +368,11 @@ class SoundService {
         this.initVoices();
       };
     }
+  }
+
+  private clearSpeechTimers() {
+    this.speechTimeoutHandles.forEach((handle) => clearTimeout(handle));
+    this.speechTimeoutHandles = [];
   }
 
   private initVoices() {
@@ -654,7 +775,7 @@ class SoundService {
 
   /**
    * Speaks dialogue in-character with tailored persona acoustic modeling,
-   * natural conversational pace, prosody enhancement, and distinct voice allocation.
+   * natural conversational pace, prosody enhancement, breath units, and distinct voice allocation.
    */
   public speak(
     text: string,
@@ -671,79 +792,127 @@ class SoundService {
       return;
     }
 
-    // Cancel any ongoing speech to avoid overlapping
-    window.speechSynthesis.cancel();
+    // Cancel any ongoing speech & clear previous queue timers
+    this.stopSpeaking();
 
     const personaKey = (speakerPersona || 'sarah').toLowerCase();
     const profile = NPC_VOICE_PROFILES[personaKey] || NPC_VOICE_PROFILES.sarah;
 
-    // 1. Naturalize conversational text for authentic spoken cadence & proper pauses
-    const naturalSpokenText = naturalizeConversationalProsody(text, personaKey);
-    if (!naturalSpokenText) {
+    // Generate authentic conversational breath units with dynamic prosody
+    const chunks = buildProsodyChunks(text, personaKey);
+    if (!chunks || chunks.length === 0) {
       onEnd?.();
       return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(naturalSpokenText);
-    utterance.lang = 'en-US';
-
-    // 2. Character-specific Acoustic Modulation
-    // Applies distinct pitch, speed, and volume tailored to role, age, energy level, and rhythm:
-    // Sarah: warm, professional, medium speed (1.01x), warm pitch (1.04)
-    // Mike: casual, relaxed, fast conversational tempo (1.10x), youthful resonance (1.02)
-    // Alex: gate supervisor, crisp, composed, efficient (1.06x), articulate pitch (0.97)
-    // David: grounded airport veteran, mature, unrushed (0.92x), deep calm baritone (0.84)
-    utterance.pitch = profile.basePitch;
-    utterance.rate = profile.baseRate;
-    utterance.volume = 1.0;
-
-    // 3. Assign Distinct Voice
+    // Initialize voice allocation if not done
     if (!this.isVoicesInitialized || this.voiceMap.size === 0) {
       this.initVoices();
     }
 
-    const matchedVoice = this.voiceMap.get(personaKey);
-    if (matchedVoice) {
-      utterance.voice = matchedVoice;
-    } else {
-      // Dynamic fallback based on gender preferences
+    const assignedVoice = this.voiceMap.get(personaKey) || null;
+    let fallbackVoice: SpeechSynthesisVoice | null = null;
+    if (!assignedVoice) {
       const voices = window.speechSynthesis.getVoices();
       if (voices && voices.length > 0) {
         const isFemale = profile.gender === 'female';
-        const candidate =
+        fallbackVoice =
           voices.find((v) => v.lang.startsWith('en-US') && (isFemale ? v.name.includes('Female') || v.name.includes('Samantha') || v.name.includes('Jenny') : v.name.includes('Male') || v.name.includes('Guy') || v.name.includes('Alex') || v.name.includes('David'))) ||
           voices.find((v) => v.lang.startsWith('en-US')) ||
-          voices.find((v) => v.lang.startsWith('en'));
-        if (candidate) {
-          utterance.voice = candidate;
-        }
+          voices.find((v) => v.lang.startsWith('en')) ||
+          voices[0] ||
+          null;
       }
     }
+    const targetVoice = assignedVoice || fallbackVoice;
 
-    // 4. Lifecycle event callbacks
-    let hasEnded = false;
-    const safeEnd = () => {
-      if (!hasEnded) {
-        hasEnded = true;
+    // Track active session ID to prevent race conditions or cross-dialogue leakage
+    const sessionId = Date.now();
+    this.activeSpeechSessionId = sessionId;
+
+    let chunkIndex = 0;
+    let hasCompleted = false;
+
+    const finishSession = () => {
+      if (!hasCompleted && this.activeSpeechSessionId === sessionId) {
+        hasCompleted = true;
+        this.clearSpeechTimers();
         onEnd?.();
       }
     };
 
-    utterance.onend = safeEnd;
-    utterance.onerror = safeEnd;
-
-    // Fallback timeout in case browser TTS event hangs (e.g. mobile background tab)
-    const estimatedDurationMs = (naturalSpokenText.split(' ').length / (profile.baseRate * 2.5)) * 1000 + 1500;
-    setTimeout(() => {
-      if (!hasEnded && !window.speechSynthesis.speaking) {
-        safeEnd();
+    const speakNextChunk = () => {
+      if (this.activeSpeechSessionId !== sessionId || !this.soundEnabled) {
+        return;
       }
-    }, estimatedDurationMs);
 
-    window.speechSynthesis.speak(utterance);
+      if (chunkIndex >= chunks.length) {
+        finishSession();
+        return;
+      }
+
+      const chunk = chunks[chunkIndex];
+      chunkIndex++;
+
+      const utterance = new SpeechSynthesisUtterance(chunk.text);
+      utterance.lang = 'en-US';
+
+      if (targetVoice) {
+        utterance.voice = targetVoice;
+      }
+
+      // Dynamic modulated acoustic parameters
+      const modulatedPitch = Math.max(0.65, Math.min(1.4, profile.basePitch + chunk.pitchOffset));
+      const modulatedRate = Math.max(0.75, Math.min(1.4, profile.baseRate * chunk.rateMultiplier));
+
+      utterance.pitch = modulatedPitch;
+      utterance.rate = modulatedRate;
+      utterance.volume = 1.0;
+
+      let chunkHandled = false;
+      const onChunkDone = () => {
+        if (chunkHandled) return;
+        chunkHandled = true;
+
+        if (this.activeSpeechSessionId !== sessionId) return;
+
+        if (chunkIndex >= chunks.length) {
+          finishSession();
+        } else {
+          // Natural conversational inter-phrase pause
+          const delayMs = Math.max(40, chunk.postPauseMs || 100);
+          const timer = window.setTimeout(() => {
+            speakNextChunk();
+          }, delayMs);
+          this.speechTimeoutHandles.push(timer);
+        }
+      };
+
+      utterance.onend = onChunkDone;
+      utterance.onerror = onChunkDone;
+
+      // Watchdog timeout in case browser TTS event hangs
+      const estimatedMs = (chunk.text.split(' ').length / (modulatedRate * 2.5)) * 1000 + 1200;
+      const watchdogTimer = window.setTimeout(() => {
+        if (!chunkHandled && this.activeSpeechSessionId === sessionId) {
+          onChunkDone();
+        }
+      }, estimatedMs);
+      this.speechTimeoutHandles.push(watchdogTimer);
+
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        onChunkDone();
+      }
+    };
+
+    speakNextChunk();
   }
 
   public stopSpeaking() {
+    this.activeSpeechSessionId = 0;
+    this.clearSpeechTimers();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
