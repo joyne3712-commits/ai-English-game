@@ -583,11 +583,6 @@ export default function App() {
       if (option.itemReward.id === 'boarding_pass_verified') {
         sound.playItemGet();
         triggerReward('🎫 BOARDING PASS VERIFIED · READY TO BOARD');
-        setTimeout(() => {
-          setActiveDialogNode(null);
-          setIsBoardingSequenceActive(true);
-          setHasPlayedBoardingSeq(true);
-        }, 1200);
       }
     }
 
@@ -638,10 +633,11 @@ export default function App() {
       if (nextNode.completesObjectiveIdOnEnter) {
         completeObjective(nextNode.completesObjectiveIdOnEnter);
       }
-      setActiveDialogNode(nextNode);
+      setActiveDialogNode({ ...nextNode });
     } else {
       setActiveDialogNode(null);
-      if (hasBoardingPassVerified && !hasPlayedBoardingSeq) {
+      const isBoardingVerified = inventory.some((item) => item.id === 'boarding_pass_verified');
+      if (isBoardingVerified && !hasPlayedBoardingSeq) {
         setIsBoardingSequenceActive(true);
         setHasPlayedBoardingSeq(true);
       }

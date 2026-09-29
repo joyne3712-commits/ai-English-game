@@ -254,6 +254,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'sarah_opt_1',
         englishText: "My connecting flight was cancelled.",
+        chineseBrief: "我的转机航班被取消了。",
         toneQuality: 'natural',
         npcReply: "Yeah, I've seen a few cancellations tonight. Let me see what I can find in the system.",
         npcMoodAfter: 'helpful',
@@ -267,6 +268,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'sarah_opt_2',
         englishText: "My flight to San Francisco was cancelled.",
+        chineseBrief: "我飞往旧金山的航班被取消了。",
         toneQuality: 'natural',
         npcReply: "Yeah, UA889 had an equipment issue. Let me pull up your booking and look at available seats.",
         npcMoodAfter: 'helpful',
@@ -280,6 +282,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'sarah_opt_3',
         englishText: "Are there any meal vouchers or compensation for this delay?",
+        chineseBrief: "请问这次航班延误有提供餐饮抵用券或补偿吗？",
         toneQuality: 'natural',
         npcReply: "Yes, absolutely! Since UA889 was an airline cancellation, here is a $25 Airport Dining Voucher you can use at any cafe or restaurant tonight. Now let's get you on a replacement flight!",
         npcMoodAfter: 'helpful',
@@ -300,6 +303,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'sarah_opt_4',
         englishText: "I think my flight was cancelled.",
+        chineseBrief: "我想我的航班好像被取消了。",
         toneQuality: 'acceptable',
         npcReply: "Let me check your ticket right now. Give me a second... Okay, I found two replacement flights to San Francisco tonight.",
         npcMoodAfter: 'helpful',
@@ -327,6 +331,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'sarah_choose_ua921',
         englishText: "21:30 — UA921",
+        chineseBrief: "选择 21:30 起飞的 UA921 航班（较早到达旧金山）",
         toneQuality: 'natural',
         npcReply: "Got it! UA921 arrives earlier in San Francisco, so you won't have to worry about your hotel check-in. Boarding is soon at Gate 22, so head down the concourse right away.",
         npcMoodAfter: 'helpful',
@@ -340,6 +345,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'sarah_choose_ua937',
         englishText: "23:10 — UA937",
+        chineseBrief: "选择 23:10 起飞的 UA937 航班（时间充裕但较晚到达）",
         toneQuality: 'natural',
         npcReply: "Sure thing! UA937 gives you plenty of time to relax at the airport. Just keep in mind that you'll land pretty late in San Francisco, so make sure to notify your hotel.",
         npcMoodAfter: 'helpful',
@@ -353,6 +359,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'sarah_ask_diff',
         englishText: "What's the difference between the two flights?",
+        chineseBrief: "这两趟备选航班有什么区别？",
         toneQuality: 'natural',
         npcReply: "UA921 leaves in about 45 minutes—earlier arrival in SF, but less time before boarding. UA937 leaves at 23:10, plenty of transit time, but you might arrive after your hotel's check-in deadline.",
         npcMoodAfter: 'helpful',
@@ -364,6 +371,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'sarah_ask_luggage',
         englishText: "Will my checked baggage transfer automatically?",
+        chineseBrief: "我的托运行李会自动转运直挂吗？",
         toneQuality: 'natural',
         npcReply: "Yes! Since you checked your bags all the way from Ningbo, our ground handlers will transfer them automatically to your new flight. You don't need to re-check them.",
         npcMoodAfter: 'friendly',
@@ -384,6 +392,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'sarah_c22_opt1',
         englishText: "Thanks so much, Sarah. Heading to Gate 22 now!",
+        chineseBrief: "非常感谢你 Sarah，我现在立刻前往 Gate 22 登机口！",
         toneQuality: 'natural',
         npcReply: "You're welcome! Follow the signs on the right for Gate 22.",
         npcMoodAfter: 'friendly',
@@ -415,6 +424,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'sarah_c31_opt1',
         englishText: "Thank you Sarah. I will message my hotel about the late arrival.",
+        chineseBrief: "谢谢你 Sarah，我会发信息通知酒店我会晚点入住。",
         toneQuality: 'natural',
         npcReply: "Good thinking! Your checked luggage will transfer to UA937 automatically. Gate 31 is upstairs past the escalator.",
         npcMoodAfter: 'friendly',
@@ -446,6 +456,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'sarah_pr22_1',
         englishText: "On my way to Gate 22 now. Thanks again!",
+        chineseBrief: "我正在去 Gate 22 登机口的路上，再次感谢！",
         toneQuality: 'natural',
         npcReply: "Have a safe flight to San Francisco!",
         npcMoodAfter: 'friendly',
@@ -465,6 +476,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'sarah_pr31_1',
         englishText: "Thanks Sarah, heading over toward the gate area.",
+        chineseBrief: "谢谢 Sarah，我现在前往登机区了。",
         toneQuality: 'natural',
         npcReply: "Have a pleasant trip to SF!",
         npcMoodAfter: 'friendly',
@@ -492,6 +504,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'mike_opt_coffee',
         englishText: "Could I get something from the cafe? What do you recommend?",
+        chineseBrief: "我能买点喝的吗？请问有什么推荐？",
         toneQuality: 'natural',
         npcReply: "Sure! I help out here at Skyline Brew while waiting. Our Hot Americano gives a great caffeine kick, and the Caramel Oat Latte with Matcha Cookies is our best seller!",
         npcMoodAfter: 'friendly',
@@ -503,6 +516,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'mike_opt_flight_advice',
         englishText: "You're heading to San Francisco too? My flight was cancelled.",
+        chineseBrief: "你也是去旧金山吗？我的航班刚才被取消了。",
         toneQuality: 'natural',
         npcReply: "Man, that sucks. UA889 right? If you take the 21:30 flight (UA921), you'll make it to your hotel comfortably before 23:00. But if you're tired, the 23:10 flight gives you more time to chill. Go talk to Sarah at Counter B!",
         npcMoodAfter: 'helpful',
@@ -518,6 +532,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'mike_opt_wifi',
         englishText: "Do you know the Wi-Fi password or where I can charge my phone?",
+        chineseBrief: "请问你知道这里的 Wi-Fi 密码或者哪里能给手机充电吗？",
         toneQuality: 'natural',
         npcReply: "Yeah! Network is 'SkylineBrew_Guest', no password needed. There are also USB-C fast charging stations right next to Gate 18 by the windows!",
         npcMoodAfter: 'helpful',
@@ -535,6 +550,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'mike_opt_chitchat',
         englishText: "What brings you to San Francisco?",
+        chineseBrief: "你这次去旧金山是有什么行程？",
         toneQuality: 'natural',
         npcReply: "I'm heading to a tech conference in Silicon Valley. If it's your first time in SF, definitely ride the cable car from Powell St to Fisherman's Wharf—the view is unreal!",
         npcMoodAfter: 'friendly',
@@ -554,6 +570,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'mike_buy_americano',
         englishText: "I'd like a Hot Americano, please. ($3.50)",
+        chineseBrief: "我想要一杯热美式咖啡（$3.50）。",
         toneQuality: 'natural',
         npcReply: "One fresh dark roast Americano coming right up! That should keep you sharp for the long flight.",
         npcMoodAfter: 'friendly',
@@ -571,6 +588,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'mike_buy_latte_combo',
         englishText: "I'll have a Caramel Oat Latte and a Matcha Cookie. ($6.50)",
+        chineseBrief: "我想要一杯焦糖燕麦拿铁和一份抹茶曲奇（$6.50）。",
         toneQuality: 'natural',
         npcReply: "Great choice! Fresh steamed oat milk with rich espresso and a warm Japanese matcha cookie. Enjoy!",
         npcMoodAfter: 'friendly',
@@ -588,6 +606,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'mike_buy_sparkling',
         englishText: "Just a bottle of chilled sparkling water, please. ($2.00)",
+        chineseBrief: "麻烦给我一瓶冰镇气泡水就好（$2.00）。",
         toneQuality: 'natural',
         npcReply: "Here you go! Cold and refreshing.",
         npcMoodAfter: 'friendly',
@@ -605,6 +624,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'mike_buy_back',
         englishText: "Actually, let me ask about flights first.",
+        chineseBrief: "我还是先去问一下改签航班的事情吧。",
         toneQuality: 'natural',
         npcReply: "No problem at all! What's on your mind?",
         npcMoodAfter: 'helpful',
@@ -633,6 +653,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'elena_give_directions',
         englishText: "Baggage Carousel 03 is right down that hallway on the left.",
+        chineseBrief: "行李提取传输带 03 就在左前方走廊尽头。",
         toneQuality: 'natural',
         npcReply: "Oh wonderful, thank you so much! My flight landed from Osaka and I was so disoriented. Here, take this spare travel eye mask—it's super comfortable for red-eye flights!",
         npcMoodAfter: 'friendly',
@@ -654,6 +675,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'elena_ask_sf',
         englishText: "Are you also flying to San Francisco tonight?",
+        chineseBrief: "你今晚也是飞往旧金山吗？",
         toneQuality: 'natural',
         npcReply: "Yes! I visit San Francisco often. A little insider tip: even in summer, pack a light jacket because the evening fog rolling off the bay gets surprisingly chilly!",
         npcMoodAfter: 'friendly',
@@ -664,6 +686,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'elena_flight_cancelled',
         englishText: "My connecting flight UA889 was just cancelled.",
+        chineseBrief: "我的转机航班 UA889 刚才被取消了。",
         toneQuality: 'natural',
         npcReply: "Oh no, that's stressful! Don't worry, Passenger Service Counter B is right in the center concourse. Sarah there is super efficient at rebooking.",
         npcMoodAfter: 'helpful',
@@ -692,6 +715,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'david_ask_service_desk',
         englishText: "Where is the Passenger Service Desk for flight rebooking?",
+        chineseBrief: "请问办理航班改签的旅客服务柜台在哪里？",
         toneQuality: 'natural',
         npcReply: "Passenger Service Counter B is directly opposite the central flight display board. Agent Sarah is on duty there right now.",
         npcMoodAfter: 'helpful',
@@ -703,6 +727,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'david_ask_souvenirs',
         englishText: "Are any souvenir shops open late for Japanese snacks?",
+        chineseBrief: "请问有营业到深夜的日本特色伴手礼店吗？",
         toneQuality: 'natural',
         npcReply: "Yes! The Duty-Free boutique near Gate 20 is open 24 hours. Here, take a sample box of Tokyo Banana to enjoy while you wait!",
         npcMoodAfter: 'friendly',
@@ -720,6 +745,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'david_ask_lounges',
         englishText: "Is there a quiet rest area or lounge for transit passengers?",
+        chineseBrief: "请问有适合转机旅客休息的安静休息室或候机区吗？",
         toneQuality: 'natural',
         npcReply: "Yes, the SkyLounge on the upper mezzanine offers free reclining massage chairs, hot green tea, and high-speed Wi-Fi for all international transit guests.",
         npcMoodAfter: 'helpful',
@@ -747,6 +773,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'alex_opt_error',
         englishText: "Excuse me, my digital boarding pass isn't loading on my phone.",
+        chineseBrief: "打扰一下，我的手机电子登机牌加载不出来了。",
         toneQuality: 'natural',
         npcReply: "No problem at all! Let me scan your passport. Ah yes, I see your confirmed reservation to San Francisco! Which seat preference do you have: Window or Aisle?",
         npcMoodAfter: 'helpful',
@@ -758,6 +785,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'alex_opt_verified',
         englishText: "Here is my passport and rebooking slip.",
+        chineseBrief: "这是我的护照和改签凭证。",
         toneQuality: 'natural',
         npcReply: "Perfect! Everything checks out in our manifest. Would you prefer a Window Seat (14A) or an Aisle Seat (14C)?",
         npcMoodAfter: 'helpful',
@@ -778,6 +806,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'alex_seat_window',
         englishText: "I'd love the Window Seat (14A), please.",
+        chineseBrief: "我想要靠窗座位 (14A)，谢谢。",
         toneQuality: 'natural',
         npcReply: "Done! Seat 14A assigned. You'll get an incredible view flying into the Golden Gate Bridge tomorrow morning! Here is your verified boarding pass. Walk through the gate to board!",
         npcMoodAfter: 'friendly',
@@ -796,6 +825,7 @@ export const DIALOGUE_NODES: Record<string, DialogNode> = {
       {
         id: 'alex_seat_aisle',
         englishText: "I'll take the Aisle Seat (14C), please.",
+        chineseBrief: "我选靠走道座位 (14C)，谢谢。",
         toneQuality: 'natural',
         npcReply: "All set! Seat 14C assigned with extra ease of movement. Here is your verified boarding pass. Proceed right through the doorway to the aircraft!",
         npcMoodAfter: 'friendly',

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { DialogNode, DialogueOption, Character } from '../types';
 import { sound } from '../services/soundService';
 import { evaluatePlayerFreeResponse, AiEvaluationResult } from '../services/aiDialogueService';
+import { getOptionChineseTranslation } from '../utils/translationUtils';
 import { Volume2, X, ChevronRight, Globe, Lightbulb, Sparkles, Send, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface RpgDialogueBoxProps {
@@ -257,6 +258,16 @@ export const RpgDialogueBox: React.FC<RpgDialogueBoxProps> = ({
       return;
     }
     const nextId = activeOption.nextDialogNodeId || null;
+    if (nextId === dialogNode.id) {
+      // Returning to the same node's choices (e.g. asking for details then returning to choice list)
+      setPhase('player_turn');
+      setActiveOption(null);
+      setReactionText('');
+      setIsReactionDone(false);
+      setAiAlternative(null);
+      setDisplayedXp(0);
+      return;
+    }
     onAdvanceNode(nextId);
   };
 
@@ -275,52 +286,6 @@ export const RpgDialogueBox: React.FC<RpgDialogueBoxProps> = ({
       default:
         return '👤';
     }
-  };
-
-  // Helper dictionary for instant Chinese translations of player options
-  const getOptionTranslation = (option: DialogueOption): string => {
-    if (option.chineseBrief) return option.chineseBrief;
-    if (option.intentLabelCn) return option.intentLabelCn;
-
-    const text = option.englishText.trim();
-    const map: Record<string, string> = {
-      "My connecting flight was cancelled.": "我的转机航班被取消了。",
-      "My flight to San Francisco was cancelled.": "我飞往旧金山的航班被取消了。",
-      "Are there any meal vouchers or compensation for this delay?": "请问这次航班延误有提供餐饮抵用券或补偿吗？",
-      "I think my flight was cancelled.": "我想我的航班好像被取消了。",
-      "21:30 — UA921": "选择 21:30 起飞的 UA921 航班（较早到达旧金山）",
-      "23:10 — UA937": "选择 23:10 起飞的 UA937 航班（时间充裕但较晚到达）",
-      "What's the difference between the two flights?": "这两趟备选航班有什么区别？",
-      "Will my checked baggage transfer automatically?": "我的托运行李会自动转运直挂吗？",
-      "Thanks so much, Sarah. Heading to Gate 22 now!": "非常感谢你 Sarah，我现在立刻前往 Gate 22 登机口！",
-      "Thank you Sarah. I will message my hotel about the late arrival.": "谢谢你 Sarah，我会发信息通知酒店我会晚点入住。",
-      "On my way to Gate 22 now. Thanks again!": "我正在去 Gate 22 登机口的路上，再次感谢！",
-      "Thanks Sarah, heading over toward the gate area.": "谢谢 Sarah，我现在前往登机区了。",
-      "Could I get something from the cafe? What do you recommend?": "我能买点喝的吗？请问有什么推荐？",
-      "I have an airline meal voucher ($25). What can I get with it?": "我有一张 $25 的航司餐饮抵用券，可以买些什么？",
-      "My flight was cancelled. How do I rebook?": "我的航班取消了，请问该怎么改签？",
-      "Just looking around the airport. What is good here?": "随便逛逛，请问这里有什么推荐的吗？",
-      "I'd like a Hot Americano ($4) please.": "我想要一杯热美式咖啡（$4）。",
-      "I'd like the Caramel Oat Latte & Matcha Cookies Combo ($9).": "我想要焦糖燕麦拿铁配抹茶曲奇套餐（$9）。",
-      "I'd like an Airport Banana Snack ($2).": "我想要一份机场能量香蕉小食（$2）。",
-      "I'd like a Silk Travel Eye Mask ($15).": "我想要一个真丝旅行眼罩（$15）。",
-      "Nothing for now, thanks Mike!": "暂时不用了，谢谢 Mike！",
-      "Hi David, could you tell me where Gate 22 is?": "你好 David，请问 Gate 22 登机口怎么走？",
-      "Hi David, which way is Gate 31?": "你好 David，请问 Gate 31 登机口在哪个方向？",
-      "Will my checked luggage transfer automatically?": "我的托运行李会自动直挂到目的地吗？",
-      "Thanks for the directions, David!": "谢谢你的指路，David！",
-      "Hi, is this the boarding gate for UA921 to San Francisco?": "你好，请问这里是飞往旧金山的 UA921 登机口吗？",
-      "Hi, is this Gate 31 for UA937 to San Francisco?": "你好，请问这里是飞往旧金山的 UA937 登机口 Gate 31 吗？",
-      "Excuse me, where is the gate for UA921? The board says it moved.": "打扰一下，请问 UA921 改到了哪个登机口？航显屏显示它换登机口了。",
-      "My phone app crashed and won't display my boarding pass.": "我的手机 App 崩溃了，显示不出电子登机牌。",
-      "Here is my passport and ticket slip. Could you print a boarding pass?": "这是我的护照和改签单，能帮我打印一张纸质登机牌吗？",
-      "Could I request a Window Seat (14A)?": "请问能帮我安排靠窗座位 (14A) 吗？",
-      "Could I request an Aisle Seat (14C)?": "请问能帮我安排靠走道座位 (14C) 吗？",
-      "Any seat is fine, thank you Alex.": "任何座位都可以，谢谢你 Alex。",
-      "Thank you Alex! Ready to board now.": "谢谢你 Alex！我现在准备登机了。",
-    };
-
-    return map[text] || '';
   };
 
   // Display all options (up to 4 choices A, B, C, D)
@@ -525,7 +490,7 @@ export const RpgDialogueBox: React.FC<RpgDialogueBoxProps> = ({
               {displayedOptions.map((option, idx) => {
                 const isSelected = selectedChoiceIdx === idx;
                 const optionLetter = ['A', 'B', 'C', 'D', 'E'][idx] || `${idx + 1}`;
-                const translation = getOptionTranslation(option);
+                const translation = getOptionChineseTranslation(option);
 
                 return (
                   <button
