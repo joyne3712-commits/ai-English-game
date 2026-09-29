@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AIRPORT_HOTSPOTS,
   CHAR_SARAH,
@@ -14,6 +14,9 @@ import {
   Hotspot,
   InventoryItem,
   QuestGoal,
+  ChapterState,
+  SelectedFlight,
+  DiscoveredInfo,
 } from './types';
 import { GameHUD } from './components/GameHUD';
 import { AirportScene } from './components/AirportScene';
@@ -21,16 +24,36 @@ import { RpgDialogueBox } from './components/RpgDialogueBox';
 import { InventoryModal } from './components/InventoryModal';
 import { QuestLogModal } from './components/QuestLogModal';
 import { MissionCompleteScreen } from './components/MissionCompleteScreen';
+import { BoardingCutscene } from './components/BoardingCutscene';
 import { OpeningCutscene } from './components/OpeningCutscene';
 import { StoryIntroModal } from './components/StoryIntroModal';
 import { ControlsTutorialBanner } from './components/ControlsTutorialBanner';
 import { PersistentQuestTracker } from './components/PersistentQuestTracker';
 import { PhoneJournalModal } from './components/PhoneJournalModal';
+import { MobileJournalModal } from './components/MobileJournalModal';
 import { QuestNotificationToast, QuestNotificationData } from './components/QuestNotificationToast';
 import { sound } from './services/soundService';
 import { formatMinutes } from './components/airport/timeCycle';
 
 export default function App() {
+  // Chapter State Machine
+  const [chapterState, setChapterState] = useState<ChapterState>('INTRO');
+
+  // Discovered Information State
+  const [discoveredInfo, setDiscoveredInfo] = useState<DiscoveredInfo>({
+    boardInspectedCount: 0,
+    flightCancelledKnown: false,
+    alternativeFlightsKnown: false,
+    selectedFlight: null,
+    luggageTransferKnown: false,
+    hotelCheckInKnown: true,
+    hotelContacted: false,
+    gateChangedKnown: false,
+    boardingPassErrorDiscovered: false,
+    boardingPassVerified: false,
+    completedNpcDialogues: {},
+  });
+
   // Opening Cutscene & Arrival Flow States
   const [isCutsceneActive, setIsCutsceneActive] = useState<boolean>(true);
   const [isIntroWalking, setIsIntroWalking] = useState<boolean>(false);
@@ -41,10 +64,10 @@ export default function App() {
   const [showStoryIntro, setShowStoryIntro] = useState<boolean>(false);
   const [showControlsTutorial, setShowControlsTutorial] = useState<boolean>(false);
   const [isPhoneOpen, setIsPhoneOpen] = useState<boolean>(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
-  // In-Game Time State (minutes from midnight 0 - 1440)
-  // Starts around 17:35 (sunset golden hour) to immediately present warm golden floor and wall tinting
-  const [inGameMinutes, setInGameMinutes] = useState<number>(17 * 60 + 35);
+  // In-Game Narrative Time State (Starts at 20:15 JST in Tokyo)
+  const [inGameMinutes, setInGameMinutes] = useState<number>(20 * 60 + 15);
 
   // Game HUD & Player Stats
   const [hp, setHp] = useState<number>(100);
@@ -57,7 +80,7 @@ export default function App() {
   const [goals, setGoals] = useState<QuestGoal[]>(INITIAL_QUEST_GOALS);
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
 
-  // NPC Dialogue States System (Reusable across Sarah, Mike, and all future NPCs)
+  // NPC Dialogue States System
   const [npcStates, setNpcStates] = useState<Record<string, string>>({
     sarah: 'SARAH_INTRO',
     barista: 'MIKE_INTRO',
@@ -94,16 +117,66 @@ export default function App() {
   const [isBoardingSequenceActive, setIsBoardingSequenceActive] = useState<boolean>(false);
   const [hasPlayedBoardingSeq, setHasPlayedBoardingSeq] = useState<boolean>(false);
   const [isBoardingEnteringDoor, setIsBoardingEnteringDoor] = useState<boolean>(false);
+  const [isBoardingCutsceneActive, setIsBoardingCutsceneActive] = useState<boolean>(false);
 
-  // Gate change turning point state (Story: Gate 22 -> Gate 18)
+  // Gate change turning point state (Gate 22 / Gate 31 -> Gate 18)
   const [isGateChanged, setIsGateChanged] = useState<boolean>(false);
 
-  // Check if player has the rebooked flight slip
+  // Check if player has rebooked flight slip
   const hasRebookSlip = inventory.some(
-    (item) => item.id === 'flight_rebook_slip' || item.id === 'boarding_pass_new'
+    (item) =>
+      item.id === 'flight_rebook_slip' ||
+      item.id === 'flight_rebook_slip_31' ||
+      item.id === 'boarding_pass_new'
   );
   // Check if player has the verified boarding pass
   const hasBoardingPassVerified = inventory.some((item) => item.id === 'boarding_pass_verified');
+
+  // Dynamic Current Situation description for Journal
+  const currentSituation = isGateChanged
+    ? 'All flights to San Francisco are consolidated at Gate 18 (West Concourse). Boarding has commenced.'
+    : discoveredInfo.selectedFlight === 'UA921'
+    ? 'You are confirmed on UA921 (21:30) at Gate 22. Boarding starts shortly.'
+    : discoveredInfo.selectedFlight === 'UA937'
+    ? 'You are confirmed on UA937 (23:10) at Gate 31. Arriving late in SF tonight.'
+    : 'Flight UA889 to San Francisco has been cancelled. Figure out what to do.';
+
+  // Subtle In-Game Hint System
+  const lastProgressTimeRef = useRef<number>(Date.now());
+  const [subtleHint, setSubtleHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    lastProgressTimeRef.current = Date.now();
+    setSubtleHint(null);
+  }, [goals]);
+
+  useEffect(() => {
+    if (isCutsceneActive || showStoryIntro || isMissionComplete) return;
+
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - lastProgressTimeRef.current;
+      const activeGoal = goals.find((g) => g.status === 'ACTIVE');
+      if (!activeGoal) return;
+
+      if (elapsed >= 65000 && !subtleHint) {
+        if (activeGoal.id === 'obj_figure_out') {
+          setSubtleHint("I should check the departure board or ask around.");
+        } else if (activeGoal.id === 'obj_find_replacement') {
+          setSubtleHint("Sarah at Passenger Service Counter B can help rebook flights.");
+        } else if (activeGoal.id === 'obj_get_to_gate') {
+          setSubtleHint(
+            discoveredInfo.selectedFlight === 'UA937'
+              ? 'I should head toward Gate 31 in the North Concourse.'
+              : 'I should head toward Gate 22 down the concourse.'
+          );
+        } else if (activeGoal.id === 'obj_resolve_boarding_issue') {
+          setSubtleHint("The boarding scanner had an error. Gate Agent Alex at the podium can verify my ticket.");
+        }
+      }
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [isCutsceneActive, showStoryIntro, isMissionComplete, goals, subtleHint, discoveredInfo.selectedFlight]);
 
   // Trigger floating reward text
   const triggerReward = (text: string) => {
@@ -120,19 +193,14 @@ export default function App() {
     sound.setSoundEnabled(next);
   };
 
-  // Natural passage of time in the airport world (1 in-game minute every 3 seconds)
-  useEffect(() => {
-    if (isCutsceneActive || showStoryIntro) return;
-    const interval = setInterval(() => {
-      setInGameMinutes((prev) => (prev + 1) % 1440);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [isCutsceneActive, showStoryIntro]);
+  // Narrative clock advancement helper
+  const advanceTime = (minutes: number) => {
+    setInGameMinutes((prev) => (prev + minutes) % 1440);
+  };
 
   // Keyboard shortcut listener for in-game Phone/Journal (Keys [P] or [J])
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if user is typing in dialogue input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
       if (e.code === 'KeyP' || e.code === 'KeyJ') {
@@ -166,7 +234,7 @@ export default function App() {
       setQuestNotification({
         id: Date.now(),
         type: 'new_objective',
-        title: 'Find someone who can help you',
+        title: 'Figure out what to do',
       });
     }, 4200);
     return () => clearTimeout(timer);
@@ -181,21 +249,21 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [showControlsTutorial]);
 
-  // Cycle through iconic times of day (Afternoon -> Sunset -> Twilight -> Deep Night)
+  // Cycle through iconic times of day
   const handleCycleTime = () => {
     sound.playClick();
     const presets = [
-      14 * 60 + 30, // 14:30 Afternoon (Natural terminal daylight)
-      17 * 60 + 35, // 17:35 Sunset (Warm golden hue & sunbeams)
-      19 * 60 + 20, // 19:20 Twilight (Violet dusk)
-      21 * 60 + 45, // 21:45 Deep Night (Cooler blue floor & downlights)
+      20 * 60 + 15, // 20:15 Evening
+      21 * 60 + 0,  // 21:00 Boarding Rush
+      22 * 60 + 30, // 22:30 Late Night
+      23 * 60 + 15, // 23:15 Midnight
     ];
-    const currentIdx = presets.findIndex((p) => Math.abs(p - inGameMinutes) < 55);
-    const nextIdx = currentIdx === -1 ? 1 : (currentIdx + 1) % presets.length;
+    const currentIdx = presets.findIndex((p) => Math.abs(p - inGameMinutes) < 30);
+    const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % presets.length;
     setInGameMinutes(presets[nextIdx]);
   };
 
-  // Robust Quest Progression System: Mark an objective complete and activate the next one
+  // Mark an objective complete and activate the next one
   const completeObjective = (objectiveId: string) => {
     setGoals((prevGoals) => {
       const targetIndex = prevGoals.findIndex((g) => g.id === objectiveId);
@@ -205,7 +273,6 @@ export default function App() {
 
       sound.playItemGet();
 
-      // Trigger achievement feedback toast
       setQuestNotification({
         id: Date.now(),
         type: 'complete',
@@ -214,7 +281,6 @@ export default function App() {
         xpGain: target.rewardXp,
       });
 
-      // Update target to COMPLETED
       const newGoals = prevGoals.map((g, idx) => {
         if (idx === targetIndex) {
           return { ...g, status: 'COMPLETED' as const };
@@ -222,7 +288,6 @@ export default function App() {
         return g;
       });
 
-      // Find next LOCKED objective and activate it
       const nextLockedIndex = newGoals.findIndex((g) => g.status === 'LOCKED');
       if (nextLockedIndex !== -1) {
         newGoals[nextLockedIndex] = {
@@ -230,35 +295,32 @@ export default function App() {
           status: 'ACTIVE' as const,
         };
 
-        // Queue subsequent "NEW OBJECTIVE" notification
         setTimeout(() => {
           setQuestNotification({
             id: Date.now() + 1,
             type: 'new_objective',
             title: newGoals[nextLockedIndex].text,
           });
-        }, 2600);
+        }, 2400);
       }
 
       return newGoals;
     });
   };
 
-  // Move player across the scene
+  // Track player position reference without triggering 60 FPS full React re-renders on every game frame
+  const playerPosRef = useRef<{ x: number; y: number }>(playerPos);
   const handleMovePlayer = (x: number, y: number) => {
-    setPlayerPos({ x, y });
+    playerPosRef.current = { x, y };
   };
 
-  // Open NPC dialogue dynamically based on their current state machine
+  // Open NPC dialogue dynamically based on current game state and history
   const openNpcDialogue = (npcId: string) => {
+    advanceTime(5); // +5 minutes on talking to an NPC
     sound.playAirportChime();
-    const currentState = npcStates[npcId] || (npcId === 'sarah' ? 'SARAH_INTRO' : 'MIKE_INTRO');
-    const activeGoal = goals.find((g) => g.status === 'ACTIVE');
-    const node = getNpcDialogueNode(npcId, currentState, inventory, {
-      currentObjectiveId: activeGoal?.id || '',
-      isGateChanged,
-      hasBoardingPassVerified,
-    });
+
+    const nodeId = getNpcDialogueNode(npcId, chapterState, discoveredInfo);
+    const node = DIALOGUE_NODES[nodeId] || DIALOGUE_NODES['sarah_intro'];
     setActiveDialogNode(node);
   };
 
@@ -268,36 +330,43 @@ export default function App() {
 
     switch (hotspot.id) {
       case 'board': {
+        advanceTime(2); // +2 min on inspecting board
         sound.playAirportChime();
-        if (isGateChanged) {
-          completeObjective('obj_find_new_gate');
+
+        setDiscoveredInfo((prev) => ({
+          ...prev,
+          boardInspectedCount: prev.boardInspectedCount + 1,
+          flightCancelledKnown: true,
+          alternativeFlightsKnown: true,
+        }));
+
+        if (goals.find((g) => g.id === 'obj_figure_out')?.status === 'ACTIVE') {
+          completeObjective('obj_figure_out');
         }
+        if (isGateChanged) {
+          completeObjective('obj_get_to_gate');
+        }
+
+        const hasSlip22 = inventory.some((i) => i.id === 'flight_rebook_slip') || discoveredInfo.selectedFlight === 'UA921';
+        const hasSlip31 = inventory.some((i) => i.id === 'flight_rebook_slip_31') || discoveredInfo.selectedFlight === 'UA937';
+
+        let boardText = '';
+        if (isGateChanged) {
+          boardText = `[URGENT GATE CONSOLIDATION ANNOUNCEMENT]\nALL SAN FRANCISCO DEPARTURES ➜ GATE 18 (WEST CONCOURSE)\nBoarding has commenced. All passengers please proceed to Gate 18 immediately.`;
+        } else if (hasSlip22) {
+          boardText = `[FLIGHT STATUS · CONFIRMED]\nUA 921 (21:30 to San Francisco SFO): ON TIME\nGate: Gate 22 · Boarding: 21:05\nPlease proceed down the concourse to Gate 22.`;
+        } else if (hasSlip31) {
+          boardText = `[FLIGHT STATUS · CONFIRMED]\nUA 937 (23:10 to San Francisco SFO): ON TIME\nGate: Gate 31 (North Concourse) · Boarding: 22:45\nPlease proceed to Gate 31 past security.`;
+        } else {
+          boardText = `[FLIGHT CANCELLATION NOTICE]\nUA 889 (20:40 to San Francisco SFO): CANCELLED\nReason: Equipment maintenance delay.\n\nAVAILABLE REPLACEMENT FLIGHTS:\n• UA 921 · 21:30 · Gate 22 (Earlier arrival in SF)\n• UA 937 · 23:10 · Gate 31 (Later flight · check hotel deadline)\n\nAffected passengers please proceed to Passenger Service Counter B across the hall. Agent Sarah is providing rebooking options.`;
+        }
+
         setInspectModal({
           title: 'Flight Information Display',
-          subtitle: `PACIFIC RIM AIRPORT · TERMINAL 2 · ${formatMinutes(inGameMinutes)} PST`,
-          content: isGateChanged
-            ? `[URGENT GATE CHANGE ANNOUNCEMENT]\nUA 889 (18:40 to San Francisco SFO)\nSTATUS: GATE CHANGE ➜ GATE 18 (WEST CONCOURSE)\nBoarding has commenced. All passengers please proceed to Gate 18 immediately.`
-            : hasRebookSlip
-            ? `[STATUS UPDATE]\nUA 889 (14:30 SFO): CANCELLED\n\n✓ REBOOKED CONFIRMED:\nUA 889 (18:40 to San Francisco SFO): ON TIME\nGate: Gate 22 · Boarding: 18:15\nYour rebooking is complete. Please proceed to Gate 22.`
-            : `[ALERT FLASHING]\nUA 889 (14:30 to San Francisco SFO): CANCELLED\nReason: Mechanical sensor maintenance.\n\nAll affected passengers please proceed to Passenger Service Counter B to speak with Agent Sarah for rebooking assistance.`,
-          actionText: isGateChanged
-            ? '前往 Gate 18'
-            : hasRebookSlip
-            ? '前往 Gate 22 登机口'
-            : '前往 B 柜台找 Sarah 沟通',
-          onAction: () => {
-            setInspectModal(null);
-            if (isGateChanged) {
-              handleMovePlayer(25, 23);
-              handleSelectHotspot(hotspots.find((h) => h.id === 'gate_18')!);
-            } else if (hasRebookSlip) {
-              handleMovePlayer(88, 72);
-              handleSelectHotspot(hotspots.find((h) => h.id === 'gate_b22')!);
-            } else {
-              handleMovePlayer(50, 48);
-              openNpcDialogue('sarah');
-            }
-          },
+          subtitle: `TOKYO INTERNATIONAL AIRPORT · ${formatMinutes(inGameMinutes)} JST`,
+          content: boardText,
+          actionText: '关闭 (Close)',
+          onAction: () => setInspectModal(null),
         });
         break;
       }
@@ -327,56 +396,97 @@ export default function App() {
         break;
 
       case 'gate_b22': {
-        // Turning point of Chapter 01: Discovering the gate change!
-        if (
-          hasRebookSlip ||
-          goals.find((g) => g.id === 'obj_get_to_gate22')?.status === 'ACTIVE' ||
-          isGateChanged
-        ) {
+        const hasSlip22 = inventory.some((i) => i.id === 'flight_rebook_slip') || discoveredInfo.selectedFlight === 'UA921';
+        const hasSlip31 = inventory.some((i) => i.id === 'flight_rebook_slip_31') || discoveredInfo.selectedFlight === 'UA937';
+
+        if (hasSlip22 || isGateChanged) {
           sound.playAirportChime();
           setIsGateChanged(true);
-          completeObjective('obj_get_to_gate22');
+          completeObjective('obj_get_to_gate');
 
           setInspectModal({
             title: 'Gate 22: GATE CHANGE ALERT',
-            subtitle: 'FLIGHT OPERATIONS NOTICE · SFO FLIGHT UA 889',
+            subtitle: 'OPERATIONAL FLIGHT UPDATE · SFO FLIGHTS',
             content:
-              '⚠️ ATTENTION PASSENGERS:\n\nFlight UA 889 to San Francisco has experienced an operational GATE CHANGE.\n\nNEW DEPARTURE GATE: GATE 18 (West Concourse)\n\nPlease proceed to Gate 18 immediately. Boarding will begin shortly.',
+              '⚠️ ATTENTION PASSENGERS:\n\nAll San Francisco departures have experienced an operational GATE CHANGE.\n\nNEW DEPARTURE GATE: GATE 18 (West Concourse)\n\nPlease proceed to Gate 18 immediately. Boarding will begin shortly.',
             actionText: '查明 Gate 18 位置',
             onAction: () => {
               setInspectModal(null);
-              // Prompt player to ask staff David or check signage
               openNpcDialogue('staff_david');
             },
+          });
+        } else if (hasSlip31) {
+          sound.playMistake();
+          setInspectModal({
+            title: 'Gate 22: San Francisco (Wrong Gate)',
+            subtitle: 'BOARDING GATE CHECK',
+            content:
+              'This is Gate 22 (21:30 departure).\nYour rebooking confirmation is for the 23:10 flight at Gate 31 in the North Concourse!',
+            actionText: '返回 (Back)',
+            onAction: () => setInspectModal(null),
           });
         } else {
           sound.playMistake();
           setInspectModal({
             title: 'Gate 22: San Francisco (Locked)',
-            subtitle: 'BOARDING GATE ACCESS REQUIRED',
+            subtitle: 'BOARDING PASS REQUIRED',
             content:
-              'The turnstile displays a flashing red light:\n"Valid rebooked ticket required to enter Gate 22."\n\nYou need to talk with Sarah at Counter B to get rebooked onto a new flight before you can board!',
-            actionText: '前往 B 柜台找 Sarah 沟通',
-            onAction: () => {
-              setInspectModal(null);
-              handleMovePlayer(50, 48);
-              openNpcDialogue('sarah');
-            },
+              'The turnstile displays a flashing red light:\n"Valid rebooked ticket required to enter Gate 22."\n\nYou need to find out how to get rebooked onto a new flight with Sarah at Counter B before you can board.',
+            actionText: '返回 (Back)',
+            onAction: () => setInspectModal(null),
+          });
+        }
+        break;
+      }
+
+      case 'gate_b31': {
+        const hasSlip22 = inventory.some((i) => i.id === 'flight_rebook_slip') || discoveredInfo.selectedFlight === 'UA921';
+        const hasSlip31 = inventory.some((i) => i.id === 'flight_rebook_slip_31') || discoveredInfo.selectedFlight === 'UA937';
+
+        if (hasSlip31 || isGateChanged) {
+          sound.playAirportChime();
+          setIsGateChanged(true);
+          completeObjective('obj_get_to_gate');
+
+          setInspectModal({
+            title: 'Gate 31: FLIGHT CONSOLIDATION ALERT',
+            subtitle: 'OPERATIONAL FLIGHT UPDATE · SFO FLIGHTS',
+            content:
+              '⚠️ ATTENTION PASSENGERS:\n\nAll evening San Francisco flights have been consolidated into the express service departing now from GATE 18 (West Concourse)!\n\nPlease proceed to Gate 18 immediately to board.',
+            actionText: '我知道了 (Understood)',
+            onAction: () => setInspectModal(null),
+          });
+        } else if (hasSlip22) {
+          sound.playMistake();
+          setInspectModal({
+            title: 'Gate 31: San Francisco (Wrong Gate)',
+            subtitle: 'BOARDING GATE CHECK',
+            content:
+              'This is Gate 31 (23:10 departure).\nYour rebooking confirmation is for the 21:30 flight at Gate 22!',
+            actionText: '返回 (Back)',
+            onAction: () => setInspectModal(null),
+          });
+        } else {
+          sound.playMistake();
+          setInspectModal({
+            title: 'Gate 31: San Francisco (Locked)',
+            subtitle: 'BOARDING PASS REQUIRED',
+            content:
+              'The turnstile displays a flashing red light:\n"Valid rebooked ticket required to enter Gate 31."\n\nYou need to find an alternative flight before you can enter the departure gate.',
+            actionText: '返回 (Back)',
+            onAction: () => setInspectModal(null),
           });
         }
         break;
       }
 
       case 'gate_18': {
-        // Gate 18 Boarding Door (West Concourse)
         if (hasBoardingPassVerified) {
           if (!hasPlayedBoardingSeq) {
-            // Trigger the celebration hand-off & walk to gate sequence!
             setIsBoardingSequenceActive(true);
             setHasPlayedBoardingSeq(true);
             sound.playAirportChime();
           } else {
-            // Player walks up into the jet bridge door!
             setIsBoardingEnteringDoor(true);
             setIsBoardingCelebrating(true);
             sound.playAirportChime();
@@ -384,12 +494,20 @@ export default function App() {
           }
         } else {
           sound.playMistake();
-          completeObjective('obj_get_to_gate18');
+          setChapterState('BOARDING_PASS_PROBLEM');
+          setDiscoveredInfo((prev) => ({
+            ...prev,
+            boardingPassErrorDiscovered: true,
+          }));
+
+          if (goals.find((g) => g.id === 'obj_get_to_gate')?.status === 'ACTIVE') {
+            completeObjective('obj_get_to_gate');
+          }
           setInspectModal({
-            title: 'Gate 18: San Francisco (Boarding Pass Check)',
+            title: 'Gate 18: San Francisco (Scanner Error)',
             subtitle: 'BOARDING SCANNER REQUIRED',
             content:
-              'Scanner displays an error message:\n"Digital barcode sync error: Boarding pass not verified."\n\nPlease step over to the podium to speak with Gate Agent Alex to verify and print your boarding pass.',
+              'The gate scanner beeps with a red light:\n"Digital barcode sync error: Digital boarding pass unverified on local terminal."\n\nUnable to display boarding barcode on mobile.\nPlease speak with Gate Agent Alex at the podium to verify your reservation and print a paper boarding pass.',
             actionText: '找登机口地勤 Alex 核实',
             onAction: () => {
               setInspectModal(null);
@@ -402,20 +520,15 @@ export default function App() {
 
       case 'luggage': {
         sound.playStep();
+        advanceTime(1);
         setInspectModal({
-          title: 'Baggage Claim 03 (Luggage Conveyor)',
+          title: 'Baggage Carousel 03 (Luggage Status)',
           subtitle: 'BAGGAGE LOGISTICS STATUS',
           content: hasRebookSlip
-            ? '✅ Baggage System Update:\nYour checked bags have been retagged and routed directly to the evening flight UA 889 bound for San Francisco!\n\nYou do NOT need to claim or re-check them in transit.'
-            : '⚠️ Baggage System Status:\nUA 889 luggage is currently staged in cargo holding.\nPlease complete your flight rebooking with Sarah at Counter B so your baggage tags can be updated for your new flight.',
-          actionText: hasRebookSlip ? '返回大厅' : '去 B 柜台找 Sarah 改签',
-          onAction: () => {
-            setInspectModal(null);
-            if (!hasRebookSlip) {
-              handleMovePlayer(50, 48);
-              openNpcDialogue('sarah');
-            }
-          },
+            ? '✅ Baggage System Update:\nYour checked bags have been retagged and routed directly to your flight to San Francisco!\n\nYou do NOT need to claim or re-check them in transit.'
+            : '⚠️ Baggage System Status:\nUA 889 luggage from Ningbo is currently held in transit logistics.\nWhen you complete your flight rebooking with Sarah at Counter B, your baggage tags will automatically update to your new flight.',
+          actionText: '关闭 (Close)',
+          onAction: () => setInspectModal(null),
         });
         break;
       }
@@ -437,8 +550,17 @@ export default function App() {
       triggerReward(`+${option.xpGain} XP`);
     }
 
-    if (option.coinGain > 0) {
-      setMoney((prev) => prev + option.coinGain);
+    if (option.coinGain !== 0) {
+      setMoney((prev) => Math.max(0, Math.round((prev + option.coinGain) * 100) / 100));
+      if (option.coinGain > 0) {
+        sound.playCoin();
+      } else {
+        sound.playClick();
+      }
+    }
+
+    if (option.hpChange > 0) {
+      triggerReward(`+${option.hpChange} Energy 💖`);
     }
 
     // 2. Add inventory item if rewarded
@@ -449,14 +571,18 @@ export default function App() {
         return [...prev, option.itemReward!];
       });
 
-      // Story progression: advancing to evening 20:30 when player rebooks for the 21:30 connecting flight
-      if (option.itemReward.id === 'boarding_pass_new') {
-        setInGameMinutes(20 * 60 + 30);
+      // Story progression: advancing narrative time based on flight choice
+      if (option.itemReward.id === 'flight_rebook_slip') {
+        setInGameMinutes(21 * 60 + 5);
+        triggerReward('🎫 REBOOKED · UA921 (21:30 · GATE 22)');
+      } else if (option.itemReward.id === 'flight_rebook_slip_31') {
+        setInGameMinutes(22 * 60 + 20);
+        triggerReward('🎫 REBOOKED · UA937 (23:10 · GATE 31)');
       }
+
       if (option.itemReward.id === 'boarding_pass_verified') {
         sound.playItemGet();
         triggerReward('🎫 BOARDING PASS VERIFIED · READY TO BOARD');
-        // Automatically close dialogue after a brief moment to transition seamlessly into the in-world hand-off & walking sequence!
         setTimeout(() => {
           setActiveDialogNode(null);
           setIsBoardingSequenceActive(true);
@@ -465,15 +591,35 @@ export default function App() {
       }
     }
 
-    // 3. Update NPC dialogue state if option transitions NPC
+    // 3. Update chapter state & flight choice if option advances
+    if (option.advancesChapterState) {
+      setChapterState(option.advancesChapterState);
+    }
+    if (option.selectsFlight) {
+      setDiscoveredInfo((prev) => ({
+        ...prev,
+        selectedFlight: option.selectsFlight!,
+      }));
+    }
+
+    // 4. Update NPC dialogue state and mark completed conversations
     if (option.setNpcState) {
       setNpcStates((prev) => ({
         ...prev,
         [option.setNpcState!.npcId]: option.setNpcState!.state,
       }));
+
+      // Remember dialogue completion for anti-repetition requirement
+      setDiscoveredInfo((prev) => ({
+        ...prev,
+        completedNpcDialogues: {
+          ...prev.completedNpcDialogues,
+          [`${option.setNpcState!.npcId}_done`]: true,
+        },
+      }));
     }
 
-    // 4. Complete quest objective if option marks progression
+    // 5. Complete quest objective if option marks progression
     if (option.completesGoalId) {
       completeObjective(option.completesGoalId);
     }
@@ -495,7 +641,6 @@ export default function App() {
       setActiveDialogNode(nextNode);
     } else {
       setActiveDialogNode(null);
-      // If we just verified the boarding pass with Alex and haven't played the sequence yet, trigger it!
       if (hasBoardingPassVerified && !hasPlayedBoardingSeq) {
         setIsBoardingSequenceActive(true);
         setHasPlayedBoardingSeq(true);
@@ -507,13 +652,13 @@ export default function App() {
   const handleBoardingSequenceComplete = () => {
     setIsBoardingSequenceActive(false);
     setIsBoardingCelebrating(true);
-    setPlayerPos({ x: 25, y: 22 }); // Positioned right at Gate 18 entry
-    completeObjective('obj_boarding_pass');
+    setPlayerPos({ x: 25, y: 22 });
+    completeObjective('obj_resolve_boarding_issue');
     triggerReward('🎫 BOARDING PASS VERIFIED · GATE 18 READY');
     setQuestNotification({
       id: Date.now(),
       type: 'new_objective',
-      title: 'Board Flight UA889 at Gate 18',
+      title: 'Board the flight to San Francisco',
     });
   };
 
@@ -522,7 +667,7 @@ export default function App() {
     setIsBoardingEnteringDoor(false);
     completeObjective('obj_board_flight');
     sound.playAirportChime();
-    setIsMissionComplete(true);
+    setIsBoardingCutsceneActive(true);
   };
 
   // Scene 4 finishes -> Start Scene 5 (Player walks into airport)
@@ -532,7 +677,7 @@ export default function App() {
     setPlayerPos({ x: 50, y: 95 });
   };
 
-  // Scene 5 finishes (Player reached terminal hall) -> Start Scene 6 (Phone notification & thought bubble)
+  // Scene 5 finishes (Player reached terminal hall) -> Start Scene 6 (Phone notification)
   const handleIntroWalkReachTarget = () => {
     setIsIntroWalking(false);
     setShowFlightCancelAlert(true);
@@ -550,117 +695,63 @@ export default function App() {
     setQuestNotification({
       id: Date.now(),
       type: 'new_objective',
-      title: 'Find someone who can help you',
+      title: 'Figure out what to do',
     });
   };
 
-  // Skip cutscene completely to gameplay
-  const handleSkipAll = () => {
-    setIsCutsceneActive(false);
-    setIsIntroWalking(false);
-    setShowFlightCancelAlert(false);
-    setPlayerAlert(null);
-    setShowStoryIntro(false);
-    setShowControlsTutorial(true);
-    setPlayerPos({ x: 50, y: 88 });
-    sound.playItemGet();
-    setQuestNotification({
-      id: Date.now(),
-      type: 'new_objective',
-      title: 'Find someone who can help you',
-    });
-  };
-
-  // Player clicks "ENTER AIRPORT" on Story Intro card if opened
-  const handleConfirmStoryIntro = () => {
-    setShowStoryIntro(false);
-    setShowControlsTutorial(true);
-    sound.playItemGet();
-    setQuestNotification({
-      id: Date.now(),
-      type: 'new_objective',
-      title: 'Find someone who can help you',
-    });
-  };
-
-  // Reset entire game cleanly
+  // Restart / Reset Journey
   const handleRestart = () => {
     sound.playClick();
-    setHp(100);
-    setXp(0);
-    setMoney(120);
     setGoals(INITIAL_QUEST_GOALS);
     setInventory(INITIAL_INVENTORY);
+    setChapterState('INTRO');
+    setDiscoveredInfo({
+      boardInspectedCount: 0,
+      flightCancelledKnown: false,
+      alternativeFlightsKnown: false,
+      selectedFlight: null,
+      luggageTransferKnown: false,
+      hotelCheckInKnown: true,
+      hotelContacted: false,
+      gateChangedKnown: false,
+      boardingPassErrorDiscovered: false,
+      boardingPassVerified: false,
+      completedNpcDialogues: {},
+    });
     setNpcStates({
       sarah: 'SARAH_INTRO',
       barista: 'MIKE_INTRO',
     });
-    setPlayerPos({ x: 50, y: 88 });
-    setActiveHotspot(null);
-    setActiveDialogNode(null);
-    setInspectModal(null);
-    setQuestNotification(null);
-    setIsPhoneOpen(false);
-    setIsMissionComplete(false);
+    setInGameMinutes(20 * 60 + 15);
+    setHp(100);
+    setXp(0);
+    setMoney(120);
     setIsGateChanged(false);
-    setIsCutsceneActive(true);
-    setIsIntroWalking(false);
-    setShowFlightCancelAlert(false);
-    setPlayerAlert(null);
-    setShowStoryIntro(false);
-    setShowControlsTutorial(false);
+    setIsMissionComplete(false);
     setIsBoardingCelebrating(false);
     setIsBoardingSequenceActive(false);
     setHasPlayedBoardingSeq(false);
     setIsBoardingEnteringDoor(false);
-    setInGameMinutes(17 * 60 + 35);
+    setActiveDialogNode(null);
+    setInspectModal(null);
+    setIsCutsceneActive(true);
   };
 
-  // Current active objective
-  const currentActiveGoal = goals.find((g) => g.status === 'ACTIVE') || null;
-  const uncompletedQuestsCount = goals.filter((g) => g.status !== 'COMPLETED').length;
+  // Single current active goal
+  const currentActiveGoal = goals.find((g) => g.status === 'ACTIVE');
 
   return (
-    <div className="h-screen w-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden font-sans selection:bg-amber-500 selection:text-slate-950 relative">
-      {/* 0. OPENING CUTSCENE (Scenes 1-4: Title -> Travel Setup -> Destination -> Airplane) */}
-      {isCutsceneActive && (
-        <OpeningCutscene
-          onStartArrivalWalk={handleStartArrivalWalk}
-          onSkipAll={handleSkipAll}
-          onStartGameplay={handleSkipAll}
-        />
-      )}
-
-      {/* 1. STORY PROLOGUE INTRO CARD (Answering: Who am I? What happened? What is my goal?) */}
-      <StoryIntroModal
-        isOpen={showStoryIntro}
-        onContinue={handleConfirmStoryIntro}
-      />
-
-      {/* 2. FIRST-TIME BASIC CONTROLS TUTORIAL */}
-      {showControlsTutorial && !showStoryIntro && !isCutsceneActive && (
-        <ControlsTutorialBanner onDismiss={() => setShowControlsTutorial(false)} />
-      )}
-
-      {/* 3. PERSISTENT QUEST TRACKER WIDGET (Always visible at top-left) */}
-      {!isCutsceneActive && !showStoryIntro && (
-        <PersistentQuestTracker
-          chapterTitle="CHAPTER 01"
-          questName="THE CANCELLED FLIGHT"
-          goals={goals}
-        />
-      )}
-
-      {/* 4. TOP MINIMAL GAME HUD */}
+    <div className="relative w-full h-screen bg-[#070b14] overflow-hidden select-none flex flex-col font-sans">
+      {/* 1. TOP GAME HUD (Compact Mobile Bar / Full Desktop RPG Bar) */}
       <GameHUD
-        chapterTitle="Chapter 01 · Airport"
-        missionTitle={currentActiveGoal ? currentActiveGoal.text : 'All Objectives Completed!'}
+        chapterTitle="CH. 01 · THE CONNECTION"
+        missionTitle={currentActiveGoal ? currentActiveGoal.text : 'All Objectives Complete!'}
         hp={hp}
         maxHp={maxHp}
         xp={xp}
         money={money}
         inventoryCount={inventory.length}
-        uncompletedQuestsCount={uncompletedQuestsCount}
+        uncompletedQuestsCount={goals.filter((g) => g.status !== 'COMPLETED').length}
         soundEnabled={soundEnabled}
         inGameMinutes={inGameMinutes}
         onCycleTime={handleCycleTime}
@@ -668,23 +759,35 @@ export default function App() {
         onOpenInventory={() => setIsInventoryOpen(true)}
         onOpenQuestLog={() => setIsQuestLogOpen(true)}
         onOpenPhone={() => setIsPhoneOpen(true)}
-        onOpenControls={() => setShowControlsTutorial(true)}
+        onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+        onOpenControls={() => setShowStoryIntro(true)}
         onRestart={handleRestart}
+        isDialogueActive={!!activeDialogNode}
       />
 
-      {/* CRISP QUEST OBJECTIVE COMPLETION / NEW OBJECTIVE FEEDBACK TOAST */}
+      {/* 2. DYNAMIC QUEST FEEDBACK TOAST */}
       <QuestNotificationToast
         notification={questNotification}
         onDismiss={() => setQuestNotification(null)}
       />
 
-      {/* 5. MAIN ADVENTURE VIEWPORT */}
-      <main className="flex-1 w-full h-full relative overflow-hidden flex flex-col">
-        {/* Victory Screen */}
+      {/* 3. FIRST-TIME CONTROLS TUTORIAL BANNER */}
+      {showControlsTutorial && (
+        <ControlsTutorialBanner onDismiss={() => setShowControlsTutorial(false)} />
+      )}
+
+      {/* 4. STORY INTRO MODAL (Onboarding Brief & Instructions) */}
+      <StoryIntroModal
+        isOpen={showStoryIntro}
+        onContinue={() => setShowStoryIntro(false)}
+      />
+
+      {/* 5. MAIN VIEWPORT: PIXEL ART GAMEPLAY OR VICTORY SCREEN */}
+      <main className="relative flex-1 w-full h-full overflow-hidden flex items-center justify-center">
         {isMissionComplete ? (
-          <div className="flex-1 overflow-y-auto pt-16 px-4 pb-8 flex items-center justify-center">
+          <div className="w-full h-full overflow-y-auto p-4 flex items-center justify-center z-40 animate-in zoom-in-95 duration-500">
             <MissionCompleteScreen
-              score={xp * 2 + money}
+              score={100}
               xp={xp}
               money={money}
               hp={hp}
@@ -693,11 +796,53 @@ export default function App() {
             />
           </div>
         ) : (
-          <div className="relative w-full h-full flex-1 overflow-hidden">
-            {/* World Exploration Canvas - Fills the entire screen */}
+          <div className="relative w-full h-full">
+            {/* Opening Animated Cutscene Overlay */}
+            {isCutsceneActive && (
+              <div className="absolute inset-0 z-50">
+                <OpeningCutscene
+                  onStartArrivalWalk={handleStartArrivalWalk}
+                  onSkipAll={() => {
+                    setIsCutsceneActive(false);
+                    setIsIntroWalking(false);
+                    setShowStoryIntro(true);
+                  }}
+                  onStartGameplay={() => {
+                    setIsCutsceneActive(false);
+                    setIsIntroWalking(false);
+                    setShowFlightCancelAlert(true);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Aircraft Boarding Cutscene (Jetbridge, Cabin Doorway & In-Seat Window) */}
+            {isBoardingCutsceneActive && (
+              <div className="absolute inset-0 z-50">
+                <BoardingCutscene
+                  inventory={inventory}
+                  selectedFlight={discoveredInfo.selectedFlight}
+                  onComplete={() => {
+                    setIsBoardingCutsceneActive(false);
+                    setIsMissionComplete(true);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Desktop Collapsible Quest Tracker (Hidden on mobile) */}
+            <PersistentQuestTracker
+              chapterTitle="CHAPTER 01"
+              questName="THE CONNECTION"
+              situation={currentSituation}
+              goals={goals}
+              discoveredInfo={discoveredInfo}
+            />
+
+            {/* 60 FPS Retro Pixel Art Canvas Airport Scene Engine */}
             <AirportScene
               hotspots={hotspots}
-              activeHotspotId={activeHotspot?.id || null}
+              activeHotspotId={activeHotspot?.id}
               onSelectHotspot={handleSelectHotspot}
               hasBoardingPass={hasRebookSlip}
               playerPos={playerPos}
@@ -719,7 +864,7 @@ export default function App() {
               onBoardingEnteringDoorComplete={handleBoardingEnteringDoorComplete}
             />
 
-            {/* SCENE 6: SMARTPHONE FLIGHT CANCELLED PUSH NOTIFICATION */}
+            {/* SMARTPHONE FLIGHT CANCELLED NOTIFICATION */}
             {showFlightCancelAlert && (
               <div className="absolute top-4 sm:top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4 animate-in slide-in-from-top-6 duration-300">
                 <div
@@ -744,7 +889,7 @@ export default function App() {
                         CANCELLED
                       </div>
                       <p className="text-[11px] text-slate-300 mt-1 leading-relaxed font-sans">
-                        "Please contact the passenger service desk."
+                        "Your connecting flight has been cancelled."
                       </p>
                     </div>
                   </div>
@@ -774,56 +919,17 @@ export default function App() {
               </div>
             )}
 
-            {/* Ambient Dynamic Quest Objective Prompt at bottom when no dialog is active */}
-            {!activeDialogNode && currentActiveGoal && !showStoryIntro && (
-              <div className="absolute bottom-3 inset-x-3 sm:inset-x-6 z-25 pointer-events-none flex justify-center">
-                <div className="pointer-events-auto bg-black/85 backdrop-blur-md border border-white/10 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full shadow-2xl flex items-center gap-2.5 sm:gap-3 text-xs">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                  <span className="text-slate-300 font-mono text-[11px] sm:text-xs">
-                    OBJECTIVE: {currentActiveGoal.text}
-                  </span>
+            {/* Subtle internal thought / hint when player is stuck */}
+            {subtleHint && !activeDialogNode && (
+              <div className="absolute bottom-12 inset-x-4 z-30 pointer-events-auto flex justify-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="bg-[#0b1329]/95 backdrop-blur-md border border-amber-400/60 px-3.5 py-1.5 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs text-amber-200 font-sans max-w-md">
+                  <span className="text-base shrink-0">💭</span>
+                  <span className="italic flex-1">"{subtleHint}"</span>
                   <button
-                    onClick={() => {
-                      sound.playStep();
-                      switch (currentActiveGoal.id) {
-                        case 'obj_find_help':
-                          handleMovePlayer(50, 48);
-                          openNpcDialogue('sarah');
-                          break;
-                        case 'obj_get_to_gate22':
-                          handleMovePlayer(88, 72);
-                          handleSelectHotspot(hotspots.find((h) => h.id === 'gate_b22')!);
-                          break;
-                        case 'obj_find_new_gate':
-                          handleMovePlayer(53, 52);
-                          openNpcDialogue('staff_david');
-                          break;
-                        case 'obj_get_to_gate18':
-                          handleMovePlayer(25, 23);
-                          handleSelectHotspot(hotspots.find((h) => h.id === 'gate_18')!);
-                          break;
-                        case 'obj_boarding_pass':
-                          handleMovePlayer(22, 23);
-                          openNpcDialogue('agent_alex');
-                          break;
-                        case 'obj_board_flight':
-                          handleMovePlayer(25, 23);
-                          handleSelectHotspot(hotspots.find((h) => h.id === 'gate_18')!);
-                          break;
-                        default:
-                          handleMovePlayer(50, 48);
-                          openNpcDialogue('sarah');
-                          break;
-                      }
-                    }}
-                    className="px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] sm:text-[11px] font-mono transition-all cursor-pointer shadow-md"
+                    onClick={() => setSubtleHint(null)}
+                    className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded cursor-pointer"
                   >
-                    {currentActiveGoal.id === 'obj_find_help' && 'Talk to Sarah ➜'}
-                    {currentActiveGoal.id === 'obj_get_to_gate22' && 'Go to Gate 22 ➜'}
-                    {currentActiveGoal.id === 'obj_find_new_gate' && 'Ask Staff David ➜'}
-                    {currentActiveGoal.id === 'obj_get_to_gate18' && 'Go to Gate 18 ➜'}
-                    {currentActiveGoal.id === 'obj_boarding_pass' && 'Talk to Agent Alex ➜'}
-                    {currentActiveGoal.id === 'obj_board_flight' && 'Board at Gate 18 ➜'}
+                    ✕
                   </button>
                 </div>
               </div>
@@ -832,7 +938,7 @@ export default function App() {
         )}
       </main>
 
-      {/* 6. OBJECT INSPECT MODAL (Flight board, carousel, gate, etc.) */}
+      {/* OBJECT INSPECT MODAL (Flight board, carousel, gate, etc.) */}
       {inspectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
           <div className="w-full max-w-md bg-slate-900 border-2 border-slate-700 rounded-3xl shadow-2xl p-5 sm:p-6 space-y-4">
@@ -870,7 +976,23 @@ export default function App() {
         </div>
       )}
 
-      {/* 7. IN-GAME SMARTPHONE / TRAVEL JOURNAL MODAL */}
+      {/* MOBILE COLLAPSIBLE JOURNAL & MENU MODAL */}
+      <MobileJournalModal
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        chapterTitle="CH. 01"
+        situation={currentSituation}
+        goals={goals}
+        inventory={inventory}
+        discoveredInfo={discoveredInfo}
+        onOpenInventory={() => setIsInventoryOpen(true)}
+        soundEnabled={soundEnabled}
+        onToggleSound={handleToggleSound}
+        onRestart={handleRestart}
+        inGameTimeFormatted={formatMinutes(inGameMinutes)}
+      />
+
+      {/* IN-GAME SMARTPHONE / TRAVEL JOURNAL MODAL */}
       <PhoneJournalModal
         isOpen={isPhoneOpen}
         onClose={() => setIsPhoneOpen(false)}
@@ -880,14 +1002,14 @@ export default function App() {
         isGateChanged={isGateChanged}
       />
 
-      {/* 8. INVENTORY BACKPACK MODAL */}
+      {/* INVENTORY BACKPACK MODAL */}
       <InventoryModal
         isOpen={isInventoryOpen}
         inventory={inventory}
         onClose={() => setIsInventoryOpen(false)}
       />
 
-      {/* 9. QUEST LOG MODAL */}
+      {/* QUEST LOG MODAL */}
       <QuestLogModal
         isOpen={isQuestLogOpen}
         goals={goals}

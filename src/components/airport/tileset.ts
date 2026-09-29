@@ -112,6 +112,11 @@ export function generateAirportMap(): {
         collision[r][c] = true;
       }
 
+      // Gate 18 jetbridge doorway opening (Cols 8-11, Rows 1-4) allows smooth boarding into aircraft
+      if ((r >= 1 && r <= 4) && (c >= 8 && c <= 11)) {
+        collision[r][c] = false;
+      }
+
       // 3. Boundary Walls
       if (c === 0 || c === MAP_COLS - 1) {
         tiles[r][c] = TileType.WALL_SOLID;
@@ -232,10 +237,10 @@ export function generateAirportMap(): {
     collision[14][c] = true;
   }
 
-  // 11. Gate 18 Turnstiles / Desk: Cols 7-9, Row 5
-  for (let c = 7; c <= 9; c++) {
-    collision[5][c] = true;
-  }
+  // 11. Gate 18 Podium Desk (Cols 7-8, Row 5)
+  collision[5][7] = true;
+  collision[5][8] = true;
+  // Col 9 is the open boarding doorway / jetbridge lane (walkable)
 
   // 12. Structural Pillars (4 massive architectural pillars with posters)
   const pillars = [
@@ -269,8 +274,8 @@ export const WORLD_HOTSPOTS: WorldHotspot[] = [
     name: 'Customer Service Counter B',
     nameCn: '地勤服务 B 柜台 · Sarah',
     worldX: 19.5 * TILE_SIZE,
-    worldY: 9 * TILE_SIZE,
-    interactRadius: 75,
+    worldY: 10 * TILE_SIZE,
+    interactRadius: 85,
     interactLabel: 'Talk to Sarah',
     subLabel: 'Passenger Rebooking Agent',
   },
@@ -278,18 +283,18 @@ export const WORLD_HOTSPOTS: WorldHotspot[] = [
     id: 'cafe',
     name: 'Skyline Brew Cafe',
     nameCn: '天际咖啡驿站 · Mike',
-    worldX: 5 * TILE_SIZE,
-    worldY: 8 * TILE_SIZE,
-    interactRadius: 75,
+    worldX: 5.5 * TILE_SIZE,
+    worldY: 9 * TILE_SIZE,
+    interactRadius: 85,
     interactLabel: 'Talk to Mike',
-    subLabel: 'Fresh Coffee & Lounge',
+    subLabel: 'Fresh Coffee & Delights',
   },
   {
     id: 'board',
     name: 'Main Departure Flight Board',
     nameCn: '电子航显大屏幕',
     worldX: 14 * TILE_SIZE,
-    worldY: 3.5 * TILE_SIZE,
+    worldY: 4 * TILE_SIZE,
     interactRadius: 85,
     interactLabel: 'Inspect Flight Board',
     subLabel: 'Flight Status Display',
@@ -298,11 +303,21 @@ export const WORLD_HOTSPOTS: WorldHotspot[] = [
     id: 'gate_b22',
     name: 'Gate 22: San Francisco',
     nameCn: 'Gate 22 登机口',
-    worldX: 34.5 * TILE_SIZE,
-    worldY: 14 * TILE_SIZE,
-    interactRadius: 80,
+    worldX: 33 * TILE_SIZE,
+    worldY: 13.5 * TILE_SIZE,
+    interactRadius: 90,
     interactLabel: 'Gate 22 Entrance',
-    subLabel: 'Flight UA 889 Gate',
+    subLabel: 'Flight UA 889 (6:40 PM)',
+  },
+  {
+    id: 'gate_b31',
+    name: 'Gate 31: North Concourse',
+    nameCn: 'Gate 31 登机口',
+    worldX: 33 * TILE_SIZE,
+    worldY: 7 * TILE_SIZE,
+    interactRadius: 90,
+    interactLabel: 'Gate 31 Entrance',
+    subLabel: 'Flight UA 889 (8:15 PM)',
   },
   {
     id: 'staff_david',
@@ -310,7 +325,7 @@ export const WORLD_HOTSPOTS: WorldHotspot[] = [
     nameCn: '机场地勤问讯 · David',
     worldX: 20 * TILE_SIZE,
     worldY: 12.5 * TILE_SIZE,
-    interactRadius: 70,
+    interactRadius: 80,
     interactLabel: 'Ask Staff for Help',
     subLabel: 'Airport Directions & Info',
   },
@@ -350,9 +365,9 @@ export const WORLD_HOTSPOTS: WorldHotspot[] = [
     nameCn: 'Gate 18 登机通道',
     worldX: 9.5 * TILE_SIZE,
     worldY: 5.5 * TILE_SIZE,
-    interactRadius: 75,
-    interactLabel: 'Board Flight UA 889',
-    subLabel: 'San Francisco (SFO)',
+    interactRadius: 95,
+    interactLabel: 'Board Flight to San Francisco',
+    subLabel: 'Gate 18 Express Jetbridge',
   },
   {
     id: 'luggage',

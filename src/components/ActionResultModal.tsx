@@ -5,10 +5,11 @@ import { CheckCircle2, AlertTriangle, XCircle, Sparkles, Coins, Heart, Volume2, 
 
 interface ActionResultModalProps {
   option: DialogueOption;
+  speakerPersona?: string;
   onContinue: () => void;
 }
 
-export const ActionResultModal: React.FC<ActionResultModalProps> = ({ option, onContinue }) => {
+export const ActionResultModal: React.FC<ActionResultModalProps> = ({ option, speakerPersona, onContinue }) => {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
   const handleSpeakNpcReply = () => {
@@ -18,9 +19,13 @@ export const ActionResultModal: React.FC<ActionResultModalProps> = ({ option, on
       return;
     }
     setIsPlayingAudio(true);
-    sound.speak(option.npcReply, () => {
-      setIsPlayingAudio(false);
-    });
+    sound.speak(
+      option.npcReply,
+      () => {
+        setIsPlayingAudio(false);
+      },
+      speakerPersona
+    );
   };
 
   const getToneBadge = () => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { sound } from '../services/soundService';
-import { Plane, Compass, MapPin, ChevronRight, SkipForward } from 'lucide-react';
+import { Plane, Compass, MapPin, ChevronRight, SkipForward, ArrowRight, Sparkles } from 'lucide-react';
 
 export type CutsceneScene = 'title' | 'travel_setup' | 'travel_destination' | 'airplane';
 
@@ -16,26 +16,20 @@ export const OpeningCutscene: React.FC<OpeningCutsceneProps> = ({
   onStartGameplay,
 }) => {
   const [currentScene, setCurrentScene] = useState<CutsceneScene>('title');
-  const [sceneProgress, setSceneProgress] = useState<number>(0);
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
   const airplaneCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Timing constants (in ms)
-  const SETUP_DURATION = 3800;
-  const DESTINATION_DURATION = 3600;
-  const AIRPLANE_DURATION = 3800;
-
   // Scene transition helper
   const transitionTo = (nextScene: CutsceneScene) => {
+    sound.playClick();
     setIsTransitioning(true);
     setTimeout(() => {
       setCurrentScene(nextScene);
       setIsTransitioning(false);
-      setSceneProgress(0);
-    }, 300);
+    }, 250);
   };
 
-  // Skip everything directly to gameplay
+  // Skip directly to gameplay
   const handleSkip = () => {
     sound.playClick();
     if (onSkipAll) {
@@ -52,71 +46,7 @@ export const OpeningCutscene: React.FC<OpeningCutsceneProps> = ({
     transitionTo('travel_setup');
   };
 
-  // 2. Travel Setup Timer
-  useEffect(() => {
-    if (currentScene !== 'travel_setup') return;
-    const startTime = Date.now();
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      setSceneProgress(Math.min(1, elapsed / SETUP_DURATION));
-    }, 40);
-
-    const timer = setTimeout(() => {
-      transitionTo('travel_destination');
-    }, SETUP_DURATION);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timer);
-    };
-  }, [currentScene]);
-
-  // 3. Travel Destination Timer
-  useEffect(() => {
-    if (currentScene !== 'travel_destination') return;
-    const startTime = Date.now();
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      setSceneProgress(Math.min(1, elapsed / DESTINATION_DURATION));
-    }, 40);
-
-    const timer = setTimeout(() => {
-      transitionTo('airplane');
-    }, DESTINATION_DURATION);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timer);
-    };
-  }, [currentScene]);
-
-  // 4. Airplane Sequence Canvas & Timer
-  useEffect(() => {
-    if (currentScene !== 'airplane') return;
-    const startTime = Date.now();
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      setSceneProgress(Math.min(1, elapsed / AIRPLANE_DURATION));
-    }, 40);
-
-    const timer = setTimeout(() => {
-      setIsTransitioning(true);
-      setTimeout(() => {
-        if (onStartArrivalWalk) {
-          onStartArrivalWalk();
-        } else if (onStartGameplay) {
-          onStartGameplay();
-        }
-      }, 400);
-    }, AIRPLANE_DURATION);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timer);
-    };
-  }, [currentScene, onStartArrivalWalk]);
-
-  // Pixel Airplane Canvas Rendering
+  // 4. Airplane Sequence Canvas
   useEffect(() => {
     if (currentScene !== 'airplane') return;
     const canvas = airplaneCanvasRef.current;
@@ -135,7 +65,7 @@ export const OpeningCutscene: React.FC<OpeningCutsceneProps> = ({
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, w, h);
 
-      // Sky Gradient (Matches airport tarmac & window exterior sunset palette)
+      // Sky Gradient (Matches airport tarmac sunset palette)
       const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
       skyGrad.addColorStop(0, '#12142e'); // Deep dusk
       skyGrad.addColorStop(0.35, '#2c2554'); // Twilight indigo
@@ -198,159 +128,135 @@ export const OpeningCutscene: React.FC<OpeningCutsceneProps> = ({
         [135, h - 16, '#fde047'], [155, h - 11, '#ffffff'], [175, h - 20, '#38bdf8'],
         [195, h - 15, '#fbbf24'], [215, h - 18, '#f59e0b'], [235, h - 12, '#ffffff'],
         [255, h - 22, '#ef4444'], [275, h - 14, '#fbbf24'], [295, h - 16, '#38bdf8'],
-        [25, h - 8, '#f59e0b'], [60, h - 6, '#fbbf24'], [110, h - 7, '#ffffff'],
-        [160, h - 5, '#fbbf24'], [220, h - 6, '#38bdf8'], [280, h - 7, '#ffffff'],
       ];
-      cityLights.forEach(([lx, ly, col], idx) => {
-        const pulse = Math.sin(t * 0.1 + idx) > -0.4;
-        if (pulse) {
-          ctx.fillStyle = col as string;
+      cityLights.forEach(([lx, ly, col]) => {
+        const glow = Math.sin(t * 0.05 + Number(lx)) > -0.3;
+        if (glow) {
+          ctx.fillStyle = String(col);
           ctx.fillRect(Number(lx), Number(ly), 2, 2);
         }
       });
 
-      // Animated Pixel Airliner (UA889) Flying Across
-      // Flight progression from left (x: 40) towards right (x: 230)
-      const prog = Math.min(1, t / (AIRPLANE_DURATION / 16));
-      const planeX = 35 + prog * 185;
-      const planeY = 68 + Math.sin(t * 0.04) * 4;
+      // Jet Aircraft Cruising Sprite
+      const planeBob = Math.sin(t * 0.04) * 3;
+      const px = 110;
+      const py = 75 + planeBob;
 
-      // Vapor Contrail Trail behind engines
+      // Plane Wing contrail
       ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.fillRect(planeX - 55, planeY + 8, 48, 2);
+      ctx.fillRect(px - 45, py + 8, 40, 2);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-      ctx.fillRect(planeX - 85, planeY + 7, 30, 4);
+      ctx.fillRect(px - 70, py + 8, 25, 2);
 
-      // Airliner Body (Pixel Art Jet - White Fuselage with Blue Stripe)
-      // Fuselage Base
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillRect(planeX - 6, planeY + 3, 38, 8);
-      // Cockpit Nose (Aerodynamic stepped taper)
-      ctx.fillRect(planeX + 32, planeY + 4, 4, 6);
-      ctx.fillRect(planeX + 36, planeY + 5, 4, 4);
-      ctx.fillRect(planeX + 40, planeY + 6, 2, 2);
+      // Plane Fuselage (White)
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(px, py + 4, 48, 8);
+      ctx.fillRect(px + 48, py + 5, 8, 6);
+      ctx.fillRect(px + 56, py + 7, 4, 3); // Nose cone
 
-      // Tail Fin (Swept back)
-      ctx.fillStyle = '#0284c7'; // United blue
-      ctx.fillRect(planeX - 6, planeY - 7, 7, 10);
-      ctx.fillRect(planeX - 2, planeY - 11, 4, 5);
-      ctx.fillStyle = '#38bdf8'; // Accent sky blue on fin
-      ctx.fillRect(planeX, planeY - 10, 2, 4);
+      // Cockpit Window (Sky Cyan)
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(px + 44, py + 5, 6, 3);
 
-      // Blue Livery Cheatline Along Windows
-      ctx.fillStyle = '#0284c7';
-      ctx.fillRect(planeX, planeY + 6, 34, 2);
-
-      // Cabin Windows (Glowing warm yellow interior light)
+      // Passenger Cabin Windows
       ctx.fillStyle = '#fef08a';
-      for (let wx = planeX + 4; wx <= planeX + 28; wx += 4) {
-        ctx.fillRect(wx, planeY + 5, 2, 2);
+      for (let i = 0; i < 6; i++) {
+        ctx.fillRect(px + 12 + i * 5, py + 6, 2, 2);
       }
-      // Cockpit Windshield (Dark glass)
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(planeX + 33, planeY + 4, 3, 2);
 
-      // Main Wing (Swept)
-      ctx.fillStyle = '#cbd5e1';
-      ctx.fillRect(planeX + 12, planeY + 11, 14, 4);
-      ctx.fillRect(planeX + 16, planeY + 15, 8, 4);
-      // Wing Engine Nacelle
+      // Pacific Sky Blue Tail Fin with Golden Globe Accent
+      ctx.fillStyle = '#0284c7';
+      ctx.beginPath();
+      ctx.moveTo(px, py + 4);
+      ctx.lineTo(px - 8, py - 8);
+      ctx.lineTo(px + 6, py - 8);
+      ctx.lineTo(px + 10, py + 4);
+      ctx.closePath();
+      ctx.fill();
+
+      // Tail Logo
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(px - 2, py - 6, 4, 4);
+
+      // Wing & Jet Engine
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(px + 20, py + 10, 18, 4); // Main Wing
       ctx.fillStyle = '#475569';
-      ctx.fillRect(planeX + 14, planeY + 13, 8, 4);
+      ctx.fillRect(px + 24, py + 12, 10, 4); // Engine Nacelle
 
-      // Navigation Lights (Red port, Green starboard, Flashing beacon strobe)
-      const flash = Math.floor(t / 15) % 2 === 0;
-      if (flash) {
-        // Red beacon on top of fuselage
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(planeX + 16, planeY + 1, 2, 2);
-      }
-      // Green starboard navigation light on wingtip
-      ctx.fillStyle = '#10b981';
-      ctx.fillRect(planeX + 23, planeY + 17, 2, 2);
+      // Engine Jet Flame Glow
+      const flamePuff = Math.sin(t * 0.2) > 0;
+      ctx.fillStyle = flamePuff ? '#f97316' : '#eab308';
+      ctx.fillRect(px + 22, py + 13, 2, 2);
+
+      // Flashing Wing Navigation Lights
+      const navFlash = Math.floor(t / 20) % 2 === 0;
+      ctx.fillStyle = navFlash ? '#ef4444' : '#7f1d1d';
+      ctx.fillRect(px + 18, py + 11, 2, 2); // Red Left Wingtip
+      ctx.fillStyle = navFlash ? '#10b981' : '#064e3b';
+      ctx.fillRect(px + 36, py + 11, 2, 2); // Green Right Wingtip
+      ctx.fillStyle = navFlash ? '#ffffff' : '#475569';
+      ctx.fillRect(px - 8, py - 8, 2, 2); // White Strobe Tail
 
       animId = requestAnimationFrame(render);
     };
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [currentScene, AIRPLANE_DURATION]);
+  }, [currentScene]);
+
+  const handleFinishCutscene = () => {
+    sound.playAirportChime();
+    setIsTransitioning(true);
+    setTimeout(() => {
+      if (onStartArrivalWalk) {
+        onStartArrivalWalk();
+      } else if (onStartGameplay) {
+        onStartGameplay();
+      }
+    }, 300);
+  };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden select-none bg-slate-950 font-mono">
-      {/* Global Skip Button (Always accessible) */}
-      <div className="absolute top-4 right-4 z-50">
-        <button
-          onClick={handleSkip}
-          className="px-3.5 py-1.5 rounded-lg bg-black/60 hover:bg-black/85 backdrop-blur-md border border-white/10 hover:border-amber-400/50 text-[11px] text-amber-200/90 hover:text-amber-300 flex items-center gap-1.5 transition-all cursor-pointer shadow-lg group"
-        >
-          <span>SKIP INTRO</span>
-          <SkipForward className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
-        </button>
-      </div>
-
-      {/* Screen Fade Transition Overlay */}
-      <div
-        className={`absolute inset-0 bg-slate-950 pointer-events-none z-40 transition-opacity duration-300 ${
-          isTransitioning ? 'opacity-100' : 'opacity-0'
-        }`}
-      />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 font-mono select-none overflow-hidden">
+      {/* Global Skip Button (top right) */}
+      <button
+        onClick={handleSkip}
+        className="absolute top-4 right-4 z-40 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-bold tracking-wider uppercase transition-all flex items-center gap-1.5 cursor-pointer shadow-lg backdrop-blur-md"
+        title="Skip intro cutscene"
+      >
+        <span>SKIP INTRO</span>
+        <SkipForward className="w-3.5 h-3.5 text-amber-400" />
+      </button>
 
       {/* =================================================================== */}
       {/* SCENE 1: TITLE SCREEN */}
       {/* =================================================================== */}
       {currentScene === 'title' && (
-        <div className="relative w-full h-full flex flex-col items-center justify-between p-6 overflow-hidden">
-          {/* Pixel Art Sky Background with Golden Sunset */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#241734] via-[#522544] via-[#a84334] to-[#df7c40] z-0">
-            {/* Retro Pixel Sun */}
-            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-32 h-32 sm:w-40 sm:h-40 rounded-full bg-[#fde08a] shadow-[0_0_80px_rgba(253,224,138,0.4)] opacity-90">
-              <div className="absolute inset-x-0 bottom-5 h-2 bg-[#df7c40]/40" />
-              <div className="absolute inset-x-0 bottom-10 h-1.5 bg-[#df7c40]/30" />
-              <div className="absolute inset-x-0 bottom-15 h-1 bg-[#df7c40]/20" />
-            </div>
+        <div className="relative w-full h-full flex flex-col items-center justify-between p-6 sm:p-12 overflow-hidden bg-gradient-to-b from-[#0f172a] via-[#1e1b4b] to-[#0f172a]">
+          {/* Ambient Glows */}
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-80 h-80 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Distant Mountain / City Skyline Silhouette */}
-            <div className="absolute bottom-0 inset-x-0 h-48 z-10 flex items-end">
-              <svg
-                viewBox="0 0 1000 240"
-                preserveAspectRatio="none"
-                className="w-full h-full text-[#140c1d] fill-current"
-              >
-                <path d="M0,240 L0,180 L80,160 L140,175 L220,130 L290,150 L360,110 L440,140 L520,95 L610,145 L700,105 L780,155 L860,120 L940,165 L1000,140 L1000,240 Z" opacity="0.6" fill="#20112c" />
-                <path d="M0,240 L0,195 L60,190 L110,210 L180,180 L250,190 L320,165 L410,185 L500,160 L580,180 L670,150 L750,185 L840,160 L920,190 L1000,170 L1000,240 Z" opacity="0.9" fill="#140c1d" />
-                {/* Glowing window lights in distant city blocks */}
-                <rect x="235" y="160" width="14" height="60" fill="#0d0714" />
-                <rect x="255" y="145" width="20" height="75" fill="#0d0714" />
-                <rect x="635" y="140" width="18" height="80" fill="#0d0714" />
-                <rect x="660" y="155" width="24" height="65" fill="#0d0714" />
-                <circle cx="265" cy="155" r="1.5" fill="#fde08a" />
-                <circle cx="242" cy="170" r="1.5" fill="#fde08a" />
-                <circle cx="645" cy="150" r="1.5" fill="#fde08a" />
-                <circle cx="672" cy="165" r="1.5" fill="#f87171" />
-              </svg>
-            </div>
-
-            <div className="absolute bottom-0 inset-x-0 h-10 bg-[#0f0714] border-t-2 border-[#a84334]/30" />
-          </div>
-
-          {/* Top Tagline */}
-          <div className="relative z-20 pt-8 sm:pt-12 text-center animate-in fade-in duration-600">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 border border-amber-400/20 text-amber-200/90 text-xs tracking-widest uppercase">
-              <Compass className="w-3.5 h-3.5 text-amber-400 animate-spin" style={{ animationDuration: '12s' }} />
-              <span>Pixel Travel Adventure</span>
+          {/* Top Logo Badge */}
+          <div className="relative z-20 pt-6 flex items-center gap-2">
+            <div className="px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-black tracking-widest uppercase flex items-center gap-1.5">
+              <Compass className="w-3.5 h-3.5" />
+              <span>FLUENT TRIP</span>
             </div>
           </div>
 
-          {/* Center Main Title */}
-          <div className="relative z-20 flex flex-col items-center text-center my-auto px-4 max-w-xl animate-in zoom-in-95 duration-500">
-            <h1 className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-white drop-shadow-[0_4px_0px_#522544] font-mono mb-3">
-              <span className="text-[#fde08a]">FLUENT</span>{' '}
-              <span className="text-white">TRIP</span>
+          {/* Center Title & Start Button */}
+          <div className="relative z-20 flex flex-col items-center text-center max-w-xl mx-auto my-auto">
+            <span className="text-xs sm:text-sm font-black tracking-widest text-amber-400 uppercase mb-2 block">
+              CHAPTER 01
+            </span>
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-wider mb-4 drop-shadow-[0_4px_24px_rgba(245,158,11,0.35)]">
+              THE CONNECTION
             </h1>
 
             <p className="text-sm sm:text-lg text-amber-100/90 font-medium tracking-wide drop-shadow mb-8 sm:mb-10 font-sans">
-              Your journey starts here.
+              Your international travel adventure begins here.
             </p>
 
             <button
@@ -364,17 +270,17 @@ export const OpeningCutscene: React.FC<OpeningCutsceneProps> = ({
 
           {/* Bottom Atmosphere Note */}
           <div className="relative z-20 pb-4 text-center text-[11px] text-amber-200/50">
-            <span>[ Press START JOURNEY to begin ]</span>
+            <span>[ Click START JOURNEY to begin ]</span>
           </div>
         </div>
       )}
 
       {/* =================================================================== */}
-      {/* SCENE 2: TRAVEL SETUP (Story Card) */}
+      {/* SCENE 2: TRAVEL SETUP (Story Card - Player-Paced) */}
       {/* =================================================================== */}
       {currentScene === 'travel_setup' && (
         <div className="relative w-full h-full flex items-center justify-center p-4 sm:p-6 overflow-hidden bg-slate-950">
-          <div className="w-full max-w-md bg-[#0b101b] border-2 border-amber-400/80 rounded-3xl shadow-[0_20px_60px_rgba(245,158,11,0.25)] p-6 sm:p-8 relative overflow-hidden text-slate-100 select-none animate-in fade-in zoom-in-95 duration-400">
+          <div className="w-full max-w-md bg-[#0b101b] border-2 border-amber-400/80 rounded-3xl shadow-[0_20px_60px_rgba(245,158,11,0.25)] p-6 sm:p-8 relative overflow-hidden text-slate-100 select-none animate-in fade-in zoom-in-95 duration-300">
             {/* Corner pixel brackets */}
             <div className="absolute top-2 left-2 w-3 h-3 border-t-2 border-l-2 border-amber-400" />
             <div className="absolute top-2 right-2 w-3 h-3 border-t-2 border-r-2 border-amber-400" />
@@ -382,47 +288,42 @@ export const OpeningCutscene: React.FC<OpeningCutsceneProps> = ({
             <div className="absolute bottom-2 right-2 w-3 h-3 border-b-2 border-r-2 border-amber-400" />
 
             {/* Header */}
-            <div className="text-center pb-5 border-b border-slate-800">
+            <div className="text-center pb-4 border-b border-slate-800">
               <span className="text-[11px] font-bold text-amber-400/90 tracking-widest uppercase block mb-1">
                 CHAPTER 01
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-white tracking-wider">
-                THE CANCELLED FLIGHT
+                THE CONNECTION
               </h2>
             </div>
 
             {/* Story Text */}
-            <div className="py-6 sm:py-8 space-y-4 text-center">
+            <div className="py-5 sm:py-6 space-y-4 text-center">
               <p className="text-base sm:text-lg font-bold text-amber-300 font-sans tracking-wide">
-                Your first trip alone.
+                Your first international trip alone.
               </p>
-              <div className="space-y-1.5 text-sm sm:text-base text-slate-200 font-sans font-medium leading-relaxed">
-                <p>One flight.</p>
-                <p>One unfamiliar airport.</p>
-                <p className="text-rose-300 font-semibold">One problem you didn't expect.</p>
+              <div className="space-y-2 text-sm sm:text-base text-slate-200 font-sans font-medium leading-relaxed">
+                <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 font-mono font-bold text-white tracking-wide">
+                  NINGBO ➔ TOKYO ➔ SAN FRANCISCO
+                </div>
+                <p className="text-sky-300 font-semibold">First flight completed.</p>
+                <p>Waiting in Tokyo for your connecting flight UA889.</p>
+                <p className="text-rose-300 font-bold pt-1">Then something unexpected happens...</p>
               </div>
             </div>
 
-            {/* Manual Advance Button */}
-            <div className="pt-2 flex items-center justify-between">
-              <span className="text-[10px] text-slate-400">
-                Starting your adventure...
+            {/* Manual Advance Button - Self Paced */}
+            <div className="pt-2 flex items-center justify-between border-t border-slate-800/80">
+              <span className="text-xs text-slate-400 font-sans">
+                Read at your own pace
               </span>
               <button
                 onClick={() => transitionTo('travel_destination')}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-1.5"
+                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-xs sm:text-sm tracking-wider uppercase transition-all cursor-pointer flex items-center gap-1.5 shadow-lg shadow-amber-500/20"
               >
                 <span>NEXT</span>
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronRight className="w-4 h-4" />
               </button>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="absolute bottom-0 inset-x-0 h-1 bg-slate-900">
-              <div
-                className="h-full bg-amber-400 transition-all duration-75"
-                style={{ width: `${sceneProgress * 100}%` }}
-              />
             </div>
           </div>
         </div>
@@ -433,7 +334,7 @@ export const OpeningCutscene: React.FC<OpeningCutsceneProps> = ({
       {/* =================================================================== */}
       {currentScene === 'travel_destination' && (
         <div className="relative w-full h-full flex items-center justify-center p-4 sm:p-6 overflow-hidden bg-slate-950">
-          <div className="w-full max-w-md bg-[#0b101b] border-2 border-sky-400/80 rounded-3xl shadow-[0_20px_60px_rgba(2,132,199,0.25)] p-6 sm:p-7 relative overflow-hidden text-slate-100 select-none animate-in fade-in zoom-in-95 duration-400">
+          <div className="w-full max-w-md bg-[#0b101b] border-2 border-sky-400/80 rounded-3xl shadow-[0_20px_60px_rgba(2,132,199,0.25)] p-6 sm:p-7 relative overflow-hidden text-slate-100 select-none animate-in fade-in zoom-in-95 duration-300">
             {/* Pixel corners */}
             <div className="absolute top-2 left-2 w-3 h-3 border-t-2 border-l-2 border-sky-400" />
             <div className="absolute top-2 right-2 w-3 h-3 border-t-2 border-r-2 border-sky-400" />
@@ -441,7 +342,7 @@ export const OpeningCutscene: React.FC<OpeningCutsceneProps> = ({
             <div className="absolute bottom-2 right-2 w-3 h-3 border-b-2 border-r-2 border-sky-400" />
 
             {/* Ticket Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <Plane className="w-4 h-4 text-sky-400" />
                 <span className="text-xs font-bold text-sky-300 tracking-wider">
@@ -454,70 +355,61 @@ export const OpeningCutscene: React.FC<OpeningCutsceneProps> = ({
             </div>
 
             {/* Origin & Destination Display */}
-            <div className="py-5 grid grid-cols-3 items-center text-center">
+            <div className="py-4 grid grid-cols-3 items-center text-center">
               <div className="space-y-1">
                 <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">
                   FROM
                 </span>
-                <span className="text-lg sm:text-xl font-black text-white">HOME</span>
-                <span className="text-[10px] text-slate-400 block font-mono">ORIGIN</span>
+                <span className="text-base sm:text-lg font-black text-white">NINGBO</span>
+                <span className="text-[9px] text-emerald-400 block font-mono">ARRIVED IN TOKYO</span>
               </div>
 
               {/* Animated Route Line */}
               <div className="flex flex-col items-center justify-center px-2">
                 <Plane className="w-5 h-5 text-amber-400 animate-pulse" />
                 <div className="w-full flex items-center justify-center gap-1 my-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
                   <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
                 </div>
-                <span className="text-[9px] text-slate-400">NON-STOP</span>
+                <span className="text-[9px] text-amber-300 font-mono">TRANSIT</span>
               </div>
 
               <div className="space-y-1">
                 <span className="text-[10px] text-sky-400 font-bold block uppercase tracking-wider">
                   TO
                 </span>
-                <span className="text-base sm:text-lg font-black text-amber-300">SAN FRANCISCO</span>
-                <span className="text-[10px] text-slate-400 block font-mono">SFO · TERMINAL 2</span>
+                <span className="text-sm sm:text-base font-black text-amber-300">SAN FRANCISCO</span>
+                <span className="text-[9px] text-slate-400 block font-mono">SFO · TERMINAL 2</span>
               </div>
             </div>
 
             {/* Simplified Pixel Map Card */}
-            <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-mono">
+            <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between text-xs font-mono">
                 <span className="text-slate-300">
-                  <strong className="text-white">FLIGHT:</strong> UA889
+                  <strong className="text-white">CONNECTING:</strong> UA889
                 </span>
-                <span className="text-amber-300 font-bold">6:40 PM PST</span>
+                <span className="text-amber-300 font-bold">Gate 22 · Boarding 20:40</span>
               </div>
-              <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-1 border-t border-slate-800">
-                <span>SEAT: 14A (WINDOW)</span>
-                <span>STATUS: ON TIME</span>
+              <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1.5 border-t border-slate-800">
+                <span>HOTEL: SUNSET HOTEL</span>
+                <span className="text-emerald-400 font-bold">CHECK-IN: UNTIL 23:00</span>
               </div>
             </div>
 
-            {/* Manual Advance Button */}
-            <div className="pt-4 flex items-center justify-between">
-              <span className="text-[10px] text-slate-400">
-                Boarding aircraft...
+            {/* Manual Advance Button - Self Paced */}
+            <div className="pt-4 flex items-center justify-between border-t border-slate-800/80">
+              <span className="text-xs text-slate-400 font-sans">
+                Ready to enter terminal
               </span>
               <button
                 onClick={() => transitionTo('airplane')}
-                className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-1.5"
+                className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 active:scale-95 text-white font-black text-xs sm:text-sm tracking-wider uppercase transition-all cursor-pointer flex items-center gap-1.5 shadow-lg shadow-sky-600/20"
               >
                 <span>NEXT</span>
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronRight className="w-4 h-4" />
               </button>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="absolute bottom-0 inset-x-0 h-1 bg-slate-900">
-              <div
-                className="h-full bg-sky-400 transition-all duration-75"
-                style={{ width: `${sceneProgress * 100}%` }}
-              />
             </div>
           </div>
         </div>
@@ -537,19 +429,19 @@ export const OpeningCutscene: React.FC<OpeningCutsceneProps> = ({
             style={{ imageRendering: 'pixelated' }}
           />
 
-          {/* Minimal Atmospheric Flight Caption */}
-          <div className="absolute bottom-8 inset-x-0 text-center z-30 pointer-events-none">
-            <div className="inline-block px-4 py-1.5 rounded-full bg-black/75 backdrop-blur-md border border-white/10 text-amber-200/90 text-xs tracking-wider font-mono">
-              [ FLIGHT UA889 · DESCENDING INTO SAN FRANCISCO ]
+          {/* Minimal Atmospheric Flight Caption & Clear Continue Action */}
+          <div className="absolute bottom-8 inset-x-0 flex flex-col items-center justify-center gap-3 z-30">
+            <div className="px-4 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-white/15 text-amber-200/95 text-xs sm:text-sm tracking-wider font-mono shadow-xl">
+              [ FLIGHT TRANSIT · ARRIVED AT TOKYO AIRPORT TERMINAL ]
             </div>
-          </div>
 
-          {/* Scene Progress Bar at Bottom */}
-          <div className="absolute bottom-0 inset-x-0 h-1 bg-slate-900 z-30">
-            <div
-              className="h-full bg-amber-400 transition-all duration-75"
-              style={{ width: `${sceneProgress * 100}%` }}
-            />
+            <button
+              onClick={handleFinishCutscene}
+              className="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-xs sm:text-sm tracking-widest uppercase transition-all cursor-pointer flex items-center gap-2 shadow-[0_10px_30px_rgba(245,158,11,0.4)] border-b-2 border-amber-700"
+            >
+              <span>ENTER AIRPORT TERMINAL</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}

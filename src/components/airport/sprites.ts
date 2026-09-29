@@ -590,39 +590,39 @@ export function renderDepartureBoard(
   ctx.fillStyle = '#e2e8f0';
   ctx.font = '8px monospace';
   ctx.fillText('UA 889', x + 8, y + 31);
-  ctx.fillText('NEW YORK', x + 44, y + 31);
-  ctx.fillText('14:30', x + 98, y + 31);
+  ctx.fillText('SAN FRANCISCO', x + 44, y + 31);
+  ctx.fillText('20:40', x + 104, y + 31);
 
   ctx.fillStyle = cancelFlash ? '#ef4444' : '#b91c1c';
   ctx.font = 'bold 8px monospace';
-  ctx.fillText('CANCELLED', x + 128, y + 31);
+  ctx.fillText('CANCELLED', x + 134, y + 31);
 
-  // Flight Row 2: SQ 012 ON TIME
+  // Flight Row 2: UA 921 21:30 (Gate 22) ON TIME
   ctx.fillStyle = '#cbd5e1';
   ctx.font = '8px monospace';
-  ctx.fillText('SQ 012', x + 8, y + 44);
-  ctx.fillText('SINGAPORE', x + 44, y + 44);
-  ctx.fillText('15:10', x + 98, y + 44);
+  ctx.fillText('UA 921', x + 8, y + 44);
+  ctx.fillText('SAN FRANCISCO', x + 44, y + 44);
+  ctx.fillText('21:30', x + 104, y + 44);
   ctx.fillStyle = '#10b981';
-  ctx.fillText('ON TIME', x + 128, y + 44);
+  ctx.fillText('ON TIME', x + 134, y + 44);
 
-  // Flight Row 3: BA 221 ON TIME
+  // Flight Row 3: UA 937 23:10 (Gate 31) ON TIME
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = '8px monospace';
+  ctx.fillText('UA 937', x + 8, y + 56);
+  ctx.fillText('SAN FRANCISCO', x + 44, y + 56);
+  ctx.fillText('23:10', x + 104, y + 56);
+  ctx.fillStyle = '#10b981';
+  ctx.fillText('ON TIME', x + 134, y + 56);
+
+  // Flight Row 4: JL 002 00:15
   ctx.fillStyle = '#94a3b8';
   ctx.font = '8px monospace';
-  ctx.fillText('BA 221', x + 8, y + 56);
-  ctx.fillText('LONDON', x + 44, y + 56);
-  ctx.fillText('15:45', x + 98, y + 56);
-  ctx.fillStyle = '#10b981';
-  ctx.fillText('ON TIME', x + 128, y + 56);
-
-  // Flight Row 4: DL 412 BOARDING
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '8px monospace';
-  ctx.fillText('DL 412', x + 8, y + 67);
-  ctx.fillText('SEATTLE', x + 44, y + 67);
-  ctx.fillText('16:00', x + 98, y + 67);
+  ctx.fillText('JL 002', x + 8, y + 67);
+  ctx.fillText('SAN FRANCISCO', x + 44, y + 67);
+  ctx.fillText('00:15', x + 104, y + 67);
   ctx.fillStyle = '#38bdf8';
-  ctx.fillText('BOARDING', x + 128, y + 67);
+  ctx.fillText('SCHEDULED', x + 134, y + 67);
 
   ctx.restore();
 }
@@ -834,8 +834,8 @@ export function renderStructures(
   // Luggage Trolleys Bay (Near Entrance: Cols 13-15, Row 21)
   drawLuggageTrolleyBay(ctx, 13 * TILE_SIZE, 21 * TILE_SIZE);
 
-  // 5. Security Metal Detector Frame (Cols 33-35, Rows 7-8)
-  const secX = 33 * TILE_SIZE;
+  // 5. Security Metal Detector Frame (Cols 31-33, Rows 7-8)
+  const secX = 31 * TILE_SIZE;
   const secY = 7 * TILE_SIZE;
   ctx.fillStyle = '#475569';
   ctx.fillRect(secX, secY, 8, 48); // Left column
@@ -846,6 +846,23 @@ export function renderStructures(
   ctx.beginPath();
   ctx.arc(secX + 28, secY + 5, 3, 0, Math.PI * 2);
   ctx.fill();
+
+  // 5b. Gate 31 Boarding Turnstiles & Sign (Cols 34-36, Rows 6-7)
+  const gate31X = 34 * TILE_SIZE;
+  const gate31Y = 6.5 * TILE_SIZE;
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(gate31X, gate31Y, 64, 30);
+  ctx.fillStyle = isGateChanged ? '#dc2626' : hasBoardingPass ? '#059669' : '#0284c7';
+  ctx.fillRect(gate31X + 4, gate31Y + 4, 56, 11);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 8px monospace';
+  ctx.fillText(isGateChanged ? 'GATE MOVED ➜ 18' : 'GATE 31 · SFO', gate31X + 6, gate31Y + 12);
+  ctx.fillStyle = isGateChanged ? '#ef4444' : hasBoardingPass ? '#10b981' : '#ef4444';
+  if (Math.sin(time * 0.005) > 0) {
+    ctx.beginPath();
+    ctx.arc(gate31X + 54, gate31Y + 20, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // 6. Gate B22 Boarding Turnstiles & Desk (Cols 34-36, Rows 13-14)
   const gateX = 34 * TILE_SIZE;
@@ -1408,17 +1425,73 @@ function drawGate18(
   isGate18Active: boolean
 ) {
   ctx.save();
-  // Turnstile Frame
+
+  // 1. Ambient Jetbridge Light Shaft (pouring down from doorway onto concourse floor)
+  const glowPulse = Math.sin(time * 0.003) * 0.15 + 0.85;
+  const beamGrad = ctx.createLinearGradient(x + 20, y - 60, x + 20, y + 40);
+  if (hasBoardingPassVerified) {
+    beamGrad.addColorStop(0, `rgba(56, 189, 248, ${0.45 * glowPulse})`);
+    beamGrad.addColorStop(0.5, `rgba(16, 185, 129, ${0.25 * glowPulse})`);
+    beamGrad.addColorStop(1, 'rgba(16, 185, 129, 0)');
+  } else {
+    beamGrad.addColorStop(0, `rgba(245, 158, 11, ${0.25 * glowPulse})`);
+    beamGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+  }
+  ctx.fillStyle = beamGrad;
+  ctx.beginPath();
+  ctx.moveTo(x + 2, y - 50);
+  ctx.lineTo(x + 62, y - 50);
+  ctx.lineTo(x + 72, y + 36);
+  ctx.lineTo(x - 8, y + 36);
+  ctx.closePath();
+  ctx.fill();
+
+  // 2. Illuminated Boarding Floor Carpet Mat with Animated Chevrons
+  const carpetX = x + 4;
+  const carpetY = y + 16;
+  const carpetW = 56;
+  const carpetH = 26;
+  ctx.fillStyle = hasBoardingPassVerified ? 'rgba(6, 78, 59, 0.7)' : 'rgba(30, 41, 59, 0.6)';
+  ctx.fillRect(carpetX, carpetY, carpetW, carpetH);
+  ctx.strokeStyle = hasBoardingPassVerified ? 'rgba(16, 185, 129, 0.6)' : 'rgba(56, 189, 248, 0.4)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(carpetX, carpetY, carpetW, carpetH);
+
+  // Animated Upward Chevrons on Carpet
+  if (hasBoardingPassVerified) {
+    const chevronOffset = (time * 0.04) % 18;
+    for (let c = 0; c < 3; c++) {
+      const cy = carpetY + carpetH - ((c * 8 + chevronOffset) % carpetH);
+      if (cy >= carpetY + 4 && cy <= carpetY + carpetH - 2) {
+        ctx.fillStyle = 'rgba(52, 211, 153, 0.65)';
+        ctx.beginPath();
+        ctx.moveTo(carpetX + 16, cy);
+        ctx.lineTo(carpetX + 28, cy - 5);
+        ctx.lineTo(carpetX + 40, cy);
+        ctx.lineTo(carpetX + 38, cy + 2);
+        ctx.lineTo(carpetX + 28, cy - 3);
+        ctx.lineTo(carpetX + 18, cy + 2);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+
+  // 3. Turnstile Frame & Stainless Steel Housing
   ctx.fillStyle = '#1e293b';
   ctx.fillRect(x, y, 64, 32);
-  // Screen banner
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, 64, 32);
+
+  // 4. Electronic Screen Banner (Header)
   ctx.fillStyle = hasBoardingPassVerified ? '#059669' : '#0284c7';
   ctx.fillRect(x + 4, y + 4, 56, 12);
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 8px monospace';
   ctx.fillText('GATE 18 · SFO', x + 6, y + 13);
 
-  // Status Ticker
+  // 5. Dynamic Status Ticker
   const flash = Math.sin(time * 0.005) > 0;
   ctx.fillStyle = hasBoardingPassVerified
     ? (flash ? '#10b981' : '#059669')
@@ -1428,24 +1501,49 @@ function drawGate18(
   ctx.font = 'bold 6px monospace';
   ctx.fillText(hasBoardingPassVerified ? 'BOARDING NOW' : 'PASS REQUIRED', x + 6, y + 25);
 
-  // Beacon Light
+  // 6. Beacon Light with Pulse Glow Ring
   ctx.fillStyle = hasBoardingPassVerified ? '#10b981' : '#ef4444';
   if (flash) {
     ctx.beginPath();
     ctx.arc(x + 56, y + 22, 3, 0, Math.PI * 2);
     ctx.fill();
+
+    // Pulse glow ring
+    if (hasBoardingPassVerified) {
+      const ringRadius = 4 + (time * 0.01 % 8);
+      const ringAlpha = Math.max(0, 1 - (ringRadius - 4) / 8);
+      ctx.strokeStyle = `rgba(16, 185, 129, ${ringAlpha})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x + 56, y + 22, ringRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
-  // Subtle Green Turnstile Laser Scanner Sweep when Boarding Pass is Verified
+  // 7. Turnstile Acrylic Barrier Flaps (Open when verified, closed when pass required)
+  const flapOpenProg = hasBoardingPassVerified ? 1 : 0;
+  // Left flap
+  ctx.fillStyle = hasBoardingPassVerified ? 'rgba(56, 189, 248, 0.4)' : 'rgba(239, 68, 68, 0.7)';
+  ctx.fillRect(x + 14 - flapOpenProg * 6, y + 26, 12, 4);
+  // Right flap
+  ctx.fillStyle = hasBoardingPassVerified ? 'rgba(56, 189, 248, 0.4)' : 'rgba(239, 68, 68, 0.7)';
+  ctx.fillRect(x + 38 + flapOpenProg * 6, y + 26, 12, 4);
+
+  // 8. Subtle Green Turnstile Laser Scanner Sweep
   if (hasBoardingPassVerified) {
     const sweep = (time * 0.05) % 52;
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.45)';
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.55)';
     ctx.fillRect(x + 6 + sweep, y + 28, 4, 3);
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.18)';
     ctx.fillRect(x + 6, y + 28, 52, 3);
+
+    // Scanner emitter particle glints
+    const glintPhase = time * 0.008;
+    ctx.fillStyle = '#fde047';
+    ctx.fillRect(x + 10 + Math.sin(glintPhase) * 14, y + 29, 2, 2);
   }
 
-  // Objective Star Marker '★'
+  // 9. Objective Star Marker '★'
   if (isGate18Active) {
     const starBounce = Math.sin(time * 0.006) * 4;
     const starY = y - 14 + starBounce;
@@ -2863,7 +2961,8 @@ export function renderInteractionPrompt(
   x: number,
   y: number,
   label: string,
-  time: number
+  time: number,
+  isMobile: boolean = false
 ) {
   ctx.save();
   const bounce = Math.sin(time * 0.006) * 3;
@@ -2871,7 +2970,7 @@ export function renderInteractionPrompt(
 
   ctx.font = 'bold 9px monospace';
   const textWidth = ctx.measureText(label).width;
-  const pillW = textWidth + 26;
+  const pillW = isMobile ? textWidth + 18 : textWidth + 26;
   const pillX = x - pillW / 2;
 
   // Drop Shadow
@@ -2885,17 +2984,30 @@ export function renderInteractionPrompt(
   ctx.lineWidth = 1.5;
   ctx.strokeRect(pillX, promptY, pillW, 18);
 
-  // Keycap indicator [ E ]
-  ctx.fillStyle = '#f59e0b';
-  ctx.fillRect(pillX + 3, promptY + 2, 16, 14);
-  ctx.fillStyle = '#0f172a';
-  ctx.font = 'bold 9px monospace';
-  ctx.fillText('E', pillX + 7, promptY + 12);
+  if (!isMobile) {
+    // Keycap indicator [ E ] for desktop
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(pillX + 3, promptY + 2, 16, 14);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText('E', pillX + 7, promptY + 12);
 
-  // Label text
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 9px monospace';
-  ctx.fillText(label, pillX + 22, promptY + 12.5);
+    // Label text
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText(label, pillX + 22, promptY + 12.5);
+  } else {
+    // Touch indicator icon for mobile
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.arc(pillX + 8, promptY + 9, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Label text
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText(label, pillX + 15, promptY + 12.5);
+  }
 
   // Pointer triangle
   ctx.fillStyle = '#f59e0b';
@@ -2905,6 +3017,90 @@ export function renderInteractionPrompt(
   ctx.lineTo(x, promptY + 23);
   ctx.closePath();
   ctx.fill();
+
+  ctx.restore();
+}
+
+// =========================================================================
+// JETBRIDGE BOARDING EFFECTS & TRANSITION ANIMATIONS
+// =========================================================================
+export function renderJetbridgeBoardingEffects(
+  ctx: CanvasRenderingContext2D,
+  playerX: number,
+  playerY: number,
+  doorwayX: number,
+  doorwayY: number,
+  enterProgress: number, // 0 to 1
+  time: number
+) {
+  ctx.save();
+
+  // 1. Runway Light Beacons along the jetbridge passage (Cols 9 & 10, Rows 2-4)
+  for (let r = 0; r < 4; r++) {
+    const ly = doorwayY - r * 14;
+    const pulse = Math.sin(time * 0.008 + r * 0.8) * 0.4 + 0.6;
+    
+    // Left runway beacon (Cyan)
+    ctx.fillStyle = `rgba(56, 189, 248, ${0.8 * pulse})`;
+    ctx.beginPath();
+    ctx.arc(doorwayX - 18, ly, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Right runway beacon (Amber)
+    ctx.fillStyle = `rgba(251, 191, 36, ${0.8 * pulse})`;
+    ctx.beginPath();
+    ctx.arc(doorwayX + 18, ly, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Floor glow strip
+    ctx.fillStyle = `rgba(56, 189, 248, ${0.12 * pulse})`;
+    ctx.fillRect(doorwayX - 16, ly - 1, 32, 2);
+  }
+
+  // 2. Optical Scan Confirmation Flash across the Gate (when player passes through doorway threshold)
+  if (enterProgress < 0.45) {
+    const scanAlpha = Math.sin(enterProgress * Math.PI / 0.45);
+    ctx.fillStyle = `rgba(16, 185, 129, ${0.45 * scanAlpha})`;
+    ctx.fillRect(doorwayX - 28, doorwayY - 4, 56, 8);
+    
+    // Scan wave rings
+    ctx.strokeStyle = `rgba(52, 211, 153, ${0.6 * scanAlpha})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(doorwayX, doorwayY, 12 + enterProgress * 30, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // 3. Stardust Particle Trail behind the Player
+  for (let i = 0; i < 8; i++) {
+    const seed = i * 29.3;
+    const pAge = ((time * 0.003 + seed) % 1);
+    const px = playerX + Math.sin(time * 0.006 + seed) * 12;
+    const py = playerY + 8 + pAge * 24;
+    const pAlpha = (1 - pAge) * 0.8;
+    
+    ctx.fillStyle = i % 2 === 0 ? `rgba(251, 191, 36, ${pAlpha})` : `rgba(56, 189, 248, ${pAlpha})`;
+    ctx.fillRect(px, py, 2.5, 2.5);
+  }
+
+  // 4. Luminous Cabin Sunlight / Jetbridge Horizon Bloom (grows as avatar walks deep into corridor)
+  if (enterProgress > 0.3) {
+    const bloomProg = (enterProgress - 0.3) / 0.7; // 0 to 1
+    const bloomGrad = ctx.createRadialGradient(
+      doorwayX,
+      doorwayY - 40,
+      10,
+      doorwayX,
+      doorwayY - 20,
+      120 * bloomProg
+    );
+    bloomGrad.addColorStop(0, `rgba(254, 240, 138, ${0.75 * bloomProg})`);
+    bloomGrad.addColorStop(0.5, `rgba(56, 189, 248, ${0.45 * bloomProg})`);
+    bloomGrad.addColorStop(1, 'rgba(2, 6, 23, 0)');
+
+    ctx.fillStyle = bloomGrad;
+    ctx.fillRect(doorwayX - 120, doorwayY - 100, 240, 160);
+  }
 
   ctx.restore();
 }

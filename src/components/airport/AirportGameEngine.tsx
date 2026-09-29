@@ -20,6 +20,7 @@ import {
   renderGateAgentAlex,
   renderGatePodium,
   renderBoardingConfetti,
+  renderJetbridgeBoardingEffects,
   renderBackgroundNPCs,
   renderPlayer,
   renderInteractionPrompt,
@@ -117,6 +118,116 @@ export const AirportGameEngine: React.FC<AirportGameEngineProps> = ({
   // Active in-range hotspot
   const [nearestHotspot, setNearestHotspot] = useState<WorldHotspot | null>(null);
 
+  // Mobile viewport detection
+  const checkIsMobile = () => {
+    if (typeof window === 'undefined') return false;
+    const isTouch = 'ontouchstart' in window || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
+    return window.innerWidth < 768 || (isTouch && window.innerWidth <= 1024);
+  };
+
+  const [isMobile, setIsMobile] = useState<boolean>(checkIsMobile());
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(checkIsMobile());
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Virtual Joystick State (Mobile touch & mouse dragging fallback)
+  const joystickVectorRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const [joystickThumb, setJoystickThumb] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isJoystickActive, setIsJoystickActive] = useState<boolean>(false);
+  const joystickBaseRef = useRef<HTMLDivElement | null>(null);
+  const joystickTouchIdRef = useRef<number | null>(null);
+
+  const updateJoystickFromCoords = (clientX: number, clientY: number) => {
+    if (!joystickBaseRef.current) return;
+    const rect = joystickBaseRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const maxRadius = rect.width / 2 - 8; // ~40px
+
+    let diffX = clientX - centerX;
+    let diffY = clientY - centerY;
+    const dist = Math.hypot(diffX, diffY);
+
+    if (dist > maxRadius) {
+      diffX = (diffX / dist) * maxRadius;
+      diffY = (diffY / dist) * maxRadius;
+    }
+
+    setJoystickThumb({ x: diffX, y: diffY });
+
+    if (dist < 6) {
+      joystickVectorRef.current = { dx: 0, dy: 0 };
+    } else {
+      joystickVectorRef.current = { dx: diffX / maxRadius, dy: diffY / maxRadius };
+    }
+  };
+
+  const updateJoystickFromTouch = (touch: React.Touch) => {
+    updateJoystickFromCoords(touch.clientX, touch.clientY);
+  };
+
+  const handleJoystickTouchStart = (e: React.TouchEvent) => {
+    if (isDialogueActive) return;
+    const touch = e.changedTouches[0];
+    joystickTouchIdRef.current = touch.identifier;
+    setIsJoystickActive(true);
+    updateJoystickFromTouch(touch);
+  };
+
+  const handleJoystickTouchMove = (e: React.TouchEvent) => {
+    if (!isJoystickActive) return;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === joystickTouchIdRef.current) {
+        updateJoystickFromTouch(e.changedTouches[i]);
+        break;
+      }
+    }
+  };
+
+  const handleJoystickTouchEnd = (e: React.TouchEvent) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === joystickTouchIdRef.current) {
+        joystickTouchIdRef.current = null;
+        setIsJoystickActive(false);
+        setJoystickThumb({ x: 0, y: 0 });
+        joystickVectorRef.current = { dx: 0, dy: 0 };
+        break;
+      }
+    }
+  };
+
+  // Mouse drag listeners for testing in browser mobile emulation
+  const handleJoystickMouseDown = (e: React.MouseEvent) => {
+    if (isDialogueActive) return;
+    setIsJoystickActive(true);
+    updateJoystickFromCoords(e.clientX, e.clientY);
+  };
+
+  useEffect(() => {
+    if (!isJoystickActive) return;
+
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      updateJoystickFromCoords(e.clientX, e.clientY);
+    };
+
+    const handleWindowMouseUp = () => {
+      setIsJoystickActive(false);
+      setJoystickThumb({ x: 0, y: 0 });
+      joystickVectorRef.current = { dx: 0, dy: 0 };
+    };
+
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+    };
+  }, [isJoystickActive]);
+
   // Boarding Sequence Animation State Refs
   const boardingSeqTimerRef = useRef<number>(0);
   const hasPlayedHandoffChimeRef = useRef<boolean>(false);
@@ -160,13 +271,44 @@ export const AirportGameEngine: React.FC<AirportGameEngineProps> = ({
     }
   }, [isBoardingSequenceActive]);
 
-  // Sync external percentage pos if changed externally (e.g. intro arrival)
+  // Sync external percentage pos ONLY when explicitly changed externally by cutscenes or teleports
+  const lastTeleportPosRef = useRef<{ x: number; y: number }>(playerPos);
   useEffect(() => {
-    if (!isDialogueActive && !playerWorldRef.current.isMoving && !isIntroWalking && !isBoardingSequenceActive && !isBoardingEnteringDoor) {
+    if (
+      playerPos.x !== lastTeleportPosRef.current.x ||
+      playerPos.y !== lastTeleportPosRef.current.y
+    ) {
+      lastTeleportPosRef.current = playerPos;
       playerWorldRef.current.x = (playerPos.x / 100) * WORLD_WIDTH;
       playerWorldRef.current.y = (playerPos.y / 100) * WORLD_HEIGHT;
+      playerWorldRef.current.targetX = null;
+      playerWorldRef.current.targetY = null;
+      playerWorldRef.current.isMoving = false;
+      playerWorldRef.current.vx = 0;
+      playerWorldRef.current.vy = 0;
     }
-  }, [playerPos.x, playerPos.y, isDialogueActive, isIntroWalking, isBoardingSequenceActive, isBoardingEnteringDoor]);
+  }, [playerPos.x, playerPos.y]);
+
+  // Clean up residual keys and navigation targets whenever dialogue opens or closes
+  useEffect(() => {
+    keysRef.current = {};
+    joystickVectorRef.current = { dx: 0, dy: 0 };
+    setJoystickThumb({ x: 0, y: 0 });
+    setIsJoystickActive(false);
+    playerWorldRef.current.targetX = null;
+    playerWorldRef.current.targetY = null;
+    playerWorldRef.current.isMoving = false;
+    playerWorldRef.current.vx = 0;
+    playerWorldRef.current.vy = 0;
+
+    if (!isDialogueActive) {
+      // Focus canvas & window so WASD keys and mouse movement immediately work without extra clicks
+      if (typeof window !== 'undefined') {
+        window.focus();
+      }
+      canvasRef.current?.focus();
+    }
+  }, [isDialogueActive]);
 
   // Handle intro walking setup when intro begins
   useEffect(() => {
@@ -278,18 +420,37 @@ export const AirportGameEngine: React.FC<AirportGameEngineProps> = ({
     for (const spot of WORLD_HOTSPOTS) {
       const dist = Math.hypot(worldClickX - spot.worldX, worldClickY - spot.worldY);
       if (dist <= spot.interactRadius + 24) {
-        // Move towards hotspot and trigger it!
-        playerWorldRef.current.targetX = spot.worldX;
-        playerWorldRef.current.targetY = spot.worldY + 28;
+        // Stand in front of the hotspot in walkable space:
+        let targetWalkX = spot.worldX;
+        let targetWalkY = spot.worldY;
+        if (spot.id === 'sarah_desk') {
+          targetWalkY = spot.worldY + 48; // Walkable area in front of customer service counter
+        } else if (spot.id === 'gate_18') {
+          targetWalkX = 9.8 * TILE_SIZE;
+          targetWalkY = 5.2 * TILE_SIZE;
+        } else if (spot.id === 'gate_b22' || spot.id === 'gate_b31') {
+          targetWalkX = spot.worldX - 16; // In front of turnstiles
+          targetWalkY = spot.worldY;
+        } else if (spot.id === 'cafe') {
+          targetWalkX = spot.worldX + 24;
+          targetWalkY = spot.worldY + 36;
+        } else if (spot.id === 'board') {
+          targetWalkY = spot.worldY + 40;
+        } else {
+          targetWalkY = spot.worldY + 24;
+        }
+
+        playerWorldRef.current.targetX = targetWalkX;
+        playerWorldRef.current.targetY = targetWalkY;
         const matched = hotspots.find((h) => h.id === spot.id);
         if (matched) {
           sound.playStep();
-          // If already very close, trigger immediately
+          // If already close, trigger immediately
           const playerDist = Math.hypot(
             playerWorldRef.current.x - spot.worldX,
             playerWorldRef.current.y - spot.worldY
           );
-          if (playerDist <= spot.interactRadius + 15) {
+          if (playerDist <= spot.interactRadius + 35) {
             onSelectHotspot(matched);
             return;
           }
@@ -526,24 +687,31 @@ export const AirportGameEngine: React.FC<AirportGameEngineProps> = ({
         let dy = 0;
 
         if (!isDialogueActive) {
-          const keys = keysRef.current;
-          if (keys['KeyW'] || keys['ArrowUp']) dy -= 1;
-          if (keys['KeyS'] || keys['ArrowDown']) dy += 1;
-          if (keys['KeyA'] || keys['ArrowLeft']) dx -= 1;
-          if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
+          // 1. Virtual Joystick input on mobile touch
+          if (joystickVectorRef.current.dx !== 0 || joystickVectorRef.current.dy !== 0) {
+            dx = joystickVectorRef.current.dx;
+            dy = joystickVectorRef.current.dy;
+          } else {
+            // 2. Keyboard keys on desktop
+            const keys = keysRef.current;
+            if (keys['KeyW'] || keys['ArrowUp']) dy -= 1;
+            if (keys['KeyS'] || keys['ArrowDown']) dy += 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) dx -= 1;
+            if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
 
-          // If mouse destination active
-          if (dx === 0 && dy === 0 && p.targetX !== null && p.targetY !== null) {
-            const distX = p.targetX - p.x;
-            const distY = p.targetY - p.y;
-            const dist = Math.hypot(distX, distY);
+            // 3. Mouse destination active
+            if (dx === 0 && dy === 0 && p.targetX !== null && p.targetY !== null) {
+              const distX = p.targetX - p.x;
+              const distY = p.targetY - p.y;
+              const dist = Math.hypot(distX, distY);
 
-            if (dist > 5) {
-              dx = distX / dist;
-              dy = distY / dist;
-            } else {
-              p.targetX = null;
-              p.targetY = null;
+              if (dist > 5) {
+                dx = distX / dist;
+                dy = distY / dist;
+              } else {
+                p.targetX = null;
+                p.targetY = null;
+              }
             }
           }
         }
@@ -583,6 +751,12 @@ export const AirportGameEngine: React.FC<AirportGameEngineProps> = ({
             p.y = nextY;
             moved = dy !== 0;
           }
+        }
+
+        // If player clicked on destination but is blocked by obstacle, clear target destination
+        if (!moved && (p.targetX !== null || p.targetY !== null)) {
+          p.targetX = null;
+          p.targetY = null;
         }
 
         p.isMoving = moved;
@@ -773,6 +947,21 @@ export const AirportGameEngine: React.FC<AirportGameEngineProps> = ({
       };
       renderPlayer(ctx, playerState, currentTime);
 
+      // Jetbridge Boarding Effects & Runway Beacons (when walking through Gate 18 door)
+      if (isBoardingEnteringDoor) {
+        const doorwayY = 4.8 * TILE_SIZE;
+        const enterProg = Math.min(1, Math.max(0, (doorwayY - p.y) / (2.4 * TILE_SIZE)));
+        renderJetbridgeBoardingEffects(
+          ctx,
+          p.x,
+          p.y,
+          9.8 * TILE_SIZE,
+          4.8 * TILE_SIZE,
+          enterProg,
+          currentTime
+        );
+      }
+
       // Celebratory Confetti Shower when boarding pass is verified or celebrating
       if (isBoardingCelebrating || isBoardingSequenceActive) {
         renderBoardingConfetti(ctx, 9.8 * TILE_SIZE, 4.4 * TILE_SIZE, currentTime);
@@ -785,7 +974,8 @@ export const AirportGameEngine: React.FC<AirportGameEngineProps> = ({
           foundSpot.worldX,
           foundSpot.worldY,
           foundSpot.interactLabel,
-          currentTime
+          currentTime,
+          isMobile
         );
       }
 
@@ -819,6 +1009,7 @@ export const AirportGameEngine: React.FC<AirportGameEngineProps> = ({
     onBoardingSequenceComplete,
     isBoardingEnteringDoor,
     onBoardingEnteringDoorComplete,
+    isMobile,
   ]);
 
   // Resize canvas to match container size
@@ -837,6 +1028,32 @@ export const AirportGameEngine: React.FC<AirportGameEngineProps> = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Context-sensitive action helper
+  const getActionInfo = (spot: WorldHotspot): { action: string; icon: string } => {
+    if (
+      spot.id === 'sarah_desk' ||
+      spot.id === 'staff_david' ||
+      spot.id === 'passenger_elena' ||
+      spot.id === 'agent_alex' ||
+      spot.id === 'cafe'
+    ) {
+      return { action: 'TALK', icon: '💬' };
+    }
+    if (spot.id === 'board') {
+      return { action: 'CHECK', icon: '📺' };
+    }
+    if (spot.id === 'gate_b22' || spot.id === 'gate_b31' || spot.id === 'gate_18') {
+      return { action: 'BOARD', icon: '🚪' };
+    }
+    if (spot.id === 'luggage') {
+      return { action: 'CHECK', icon: '🧳' };
+    }
+    if (spot.id === 'escalator') {
+      return { action: 'USE', icon: '🛗' };
+    }
+    return { action: 'INSPECT', icon: '🔍' };
+  };
 
   return (
     <div
@@ -866,9 +1083,9 @@ export const AirportGameEngine: React.FC<AirportGameEngineProps> = ({
         </div>
       )}
 
-      {/* 3. Subtle In-Game Movement Controls Legend (Bottom-Left) */}
-      {!isDialogueActive && (
-        <div className="absolute bottom-3 left-4 z-20 pointer-events-none hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-mono text-slate-300">
+      {/* 3. Subtle In-Game Movement Controls Legend (Desktop Only) */}
+      {!isDialogueActive && !isMobile && (
+        <div className="absolute bottom-3 left-4 z-20 pointer-events-none hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-mono text-slate-300">
           <span className="text-amber-400 font-bold">MOVE:</span>
           <span>WASD / Arrow Keys</span>
           <span className="text-slate-500">|</span>
@@ -877,21 +1094,63 @@ export const AirportGameEngine: React.FC<AirportGameEngineProps> = ({
         </div>
       )}
 
-      {/* 4. Nearest Interaction Action Button on Mobile/Touch */}
-      {nearestHotspot && !isDialogueActive && (
-        <div className="absolute bottom-3 right-4 z-25 sm:hidden pointer-events-auto">
-          <button
-            onClick={() => {
-              const matched = hotspots.find((h) => h.id === nearestHotspot.id);
-              if (matched) {
-                sound.playClick();
-                onSelectHotspot(matched);
-              }
-            }}
-            className="px-4 py-2 rounded-xl bg-amber-500 active:bg-amber-400 text-slate-950 font-black text-xs font-mono shadow-xl border border-white/20 flex items-center gap-2"
+      {/* 4. Mobile Context-Sensitive Interaction Button (Bottom-Right) */}
+      {nearestHotspot && !isDialogueActive && isMobile && (
+        <div className="absolute bottom-5 right-5 pb-[env(safe-area-inset-bottom,0.5rem)] z-30 pointer-events-auto animate-in zoom-in-95 duration-150">
+          {(() => {
+            const actionInfo = getActionInfo(nearestHotspot);
+            return (
+              <button
+                onClick={() => {
+                  const matched = hotspots.find((h) => h.id === nearestHotspot.id);
+                  if (matched) {
+                    sound.playClick();
+                    onSelectHotspot(matched);
+                  }
+                }}
+                className="w-16 h-16 min-w-[64px] min-h-[64px] rounded-2xl bg-amber-500 active:bg-amber-400 text-slate-950 shadow-[0_12px_30px_rgba(245,158,11,0.55)] border-2 border-white/60 flex flex-col items-center justify-center gap-0.5 font-mono cursor-pointer active:scale-95 transition-all select-none touch-manipulation"
+                aria-label={`${actionInfo.action} ${nearestHotspot.name}`}
+              >
+                <span className="text-xl leading-none">{actionInfo.icon}</span>
+                <span className="text-[10px] font-black tracking-wider uppercase font-mono">
+                  {actionInfo.action}
+                </span>
+              </button>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* 5. Mobile Semi-Transparent Virtual Joystick (Bottom-Left) */}
+      {!isDialogueActive && isMobile && (
+        <div className="absolute bottom-5 left-5 pb-[env(safe-area-inset-bottom,0.5rem)] z-25 pointer-events-auto select-none touch-none">
+          <div
+            ref={joystickBaseRef}
+            onTouchStart={handleJoystickTouchStart}
+            onTouchMove={handleJoystickTouchMove}
+            onTouchEnd={handleJoystickTouchEnd}
+            onTouchCancel={handleJoystickTouchEnd}
+            onMouseDown={handleJoystickMouseDown}
+            className="w-24 h-24 rounded-full bg-slate-950/30 border-2 border-white/20 backdrop-blur-[1px] relative flex items-center justify-center shadow-lg active:border-amber-400/50 transition-colors"
           >
-            <span>[ E ] {nearestHotspot.interactLabel}</span>
-          </button>
+            {/* Subtle center crosshair guide */}
+            <div className="w-1.5 h-1.5 rounded-full bg-white/30 pointer-events-none" />
+
+            {/* Moving Thumb Stick */}
+            <div
+              className={`w-11 h-11 rounded-full border-2 border-white pointer-events-none transition-shadow shadow-md flex items-center justify-center ${
+                isJoystickActive
+                  ? 'bg-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.8)]'
+                  : 'bg-amber-400/60'
+              }`}
+              style={{
+                transform: `translate(${joystickThumb.x}px, ${joystickThumb.y}px)`,
+                transition: isJoystickActive ? 'none' : 'transform 0.15s ease-out',
+              }}
+            >
+              <div className="w-3 h-3 rounded-full bg-slate-950/40" />
+            </div>
+          </div>
         </div>
       )}
     </div>

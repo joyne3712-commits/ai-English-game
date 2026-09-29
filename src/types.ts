@@ -9,6 +9,37 @@ export interface InventoryItem {
 
 export type ObjectiveStatus = 'LOCKED' | 'ACTIVE' | 'COMPLETED';
 
+export type ChapterState =
+  | 'INTRO'
+  | 'FLIGHT_NORMAL'
+  | 'FLIGHT_DELAYED'
+  | 'FLIGHT_CANCELLED'
+  | 'INVESTIGATING'
+  | 'ALTERNATIVE_FLIGHTS_FOUND'
+  | 'FLIGHT_SELECTED'
+  | 'GOING_TO_NEW_GATE'
+  | 'BOARDING_PASS_PROBLEM'
+  | 'BOARDING_RESOLVED'
+  | 'HOTEL_CHECK_REQUIRED'
+  | 'READY_TO_BOARD'
+  | 'CHAPTER_COMPLETE';
+
+export type SelectedFlight = 'UA921' | 'UA937' | null;
+
+export interface DiscoveredInfo {
+  boardInspectedCount: number;
+  flightCancelledKnown: boolean;
+  alternativeFlightsKnown: boolean;
+  selectedFlight: SelectedFlight;
+  luggageTransferKnown: boolean;
+  hotelCheckInKnown: boolean;
+  hotelContacted: boolean;
+  gateChangedKnown: boolean;
+  boardingPassErrorDiscovered: boolean;
+  boardingPassVerified: boolean;
+  completedNpcDialogues: Record<string, boolean>; // e.g., sarah_rebooked, mike_advised, staff_directed, alex_verified
+}
+
 export interface QuestGoal {
   id: string;
   order: number;
@@ -16,7 +47,7 @@ export interface QuestGoal {
   textCn?: string;
   status: ObjectiveStatus;
   rewardXp: number;
-  completedBadge?: string; // e.g. "Sarah agreed to help"
+  completedBadge?: string;
 }
 
 export interface Character {
@@ -47,6 +78,8 @@ export interface DialogueOption {
   betterAlternative?: string;
   nextDialogNodeId?: string;
   completesGoalId?: string;
+  advancesChapterState?: ChapterState;
+  selectsFlight?: SelectedFlight;
   setNpcState?: {
     npcId: string;
     state: string;
@@ -59,17 +92,15 @@ export interface DialogNode {
   npcDialogue: string;
   npcDialogueCnHint?: string;
   hintScaffolding?: {
-    level1Cn: string; // e.g. "Sarah is asking what happened. Try explaining that your flight was cancelled."
-    level2Starter?: string; // "My flight..."
+    level1Cn: string;
+    level2Starter?: string;
     level3Full?: string;
   };
   options: DialogueOption[];
-  // If this node automatically updates an NPC's state when reached
   onEnterNpcState?: {
     npcId: string;
     state: string;
   };
-  // If reaching this node directly completes an objective
   completesObjectiveIdOnEnter?: string;
 }
 

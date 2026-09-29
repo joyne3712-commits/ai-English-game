@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, HelpCircle, Navigation, MessageSquare, MousePointer } from 'lucide-react';
+import React from 'react';
+import { HelpCircle } from 'lucide-react';
 import { sound } from '../services/soundService';
 
 interface ControlsTutorialBannerProps {
@@ -10,8 +10,9 @@ export const ControlsTutorialBanner: React.FC<ControlsTutorialBannerProps> = ({
   onDismiss,
 }) => {
   return (
-    <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-25 pointer-events-auto select-none animate-in fade-in slide-in-from-bottom-3 duration-300 max-w-md w-full px-4">
-      <div className="bg-[#0b101b]/95 backdrop-blur-md border border-amber-400/60 rounded-2xl shadow-[0_10px_35px_rgba(0,0,0,0.8)] p-3 sm:p-3.5 font-mono text-slate-100">
+    // Only display on desktop md: screens, never clutter the mobile screen
+    <div className="hidden md:block absolute bottom-16 left-1/2 -translate-x-1/2 z-25 pointer-events-auto select-none animate-in fade-in slide-in-from-bottom-3 duration-300 max-w-md w-full px-4">
+      <div className="bg-[#0b101b]/95 backdrop-blur-md border border-amber-400/60 rounded-2xl shadow-[0_10px_35px_rgba(0,0,0,0.8)] p-3.5 font-mono text-slate-100">
         <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-[10px] text-amber-400 font-bold uppercase tracking-wider">
           <div className="flex items-center gap-1.5">
             <HelpCircle className="w-3.5 h-3.5" />

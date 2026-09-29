@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { DialogNode, DialogueOption, Character } from '../types';
 import { sound } from '../services/soundService';
 import { evaluatePlayerFreeResponse, AiEvaluationResult } from '../services/aiDialogueService';
-import { Volume2, X, ChevronRight, CornerDownLeft, Globe, Lightbulb, Sparkles, Send } from 'lucide-react';
+import { Volume2, X, ChevronRight, Globe, Lightbulb, Sparkles, Send, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface RpgDialogueBoxProps {
   dialogNode: DialogNode;
@@ -24,6 +24,7 @@ export const RpgDialogueBox: React.FC<RpgDialogueBoxProps> = ({
   const [phase, setPhase] = useState<DialoguePhase>('npc_speaking');
   const [displayedText, setDisplayedText] = useState<string>('');
   const [isTypewriterDone, setIsTypewriterDone] = useState<boolean>(false);
+  const [showLearningTools, setShowLearningTools] = useState<boolean>(false);
   const [showTranslation, setShowTranslation] = useState<boolean>(false);
   const [showHint, setShowHint] = useState<boolean>(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
@@ -49,6 +50,7 @@ export const RpgDialogueBox: React.FC<RpgDialogueBoxProps> = ({
     setPhase('npc_speaking');
     setDisplayedText('');
     setIsTypewriterDone(false);
+    setShowLearningTools(false);
     setShowTranslation(false);
     setShowHint(false);
     setActiveOption(null);
@@ -75,9 +77,6 @@ export const RpgDialogueBox: React.FC<RpgDialogueBoxProps> = ({
         setDisplayedText(fullText);
         setIsTypewriterDone(true);
         clearInterval(interval);
-        setTimeout(() => {
-          setPhase('player_turn');
-        }, 180);
       } else {
         setDisplayedText(fullText.slice(0, idx));
       }
@@ -97,38 +96,53 @@ export const RpgDialogueBox: React.FC<RpgDialogueBoxProps> = ({
       if (idx >= fullText.length) {
         clearInterval(interval);
         setIsReactionDone(true);
+      } else {
+        // fast typing
       }
     }, 16);
 
     return () => clearInterval(interval);
   }, [phase, reactionText]);
 
-  // Fast forward typewriter on click
-  const handleSkipTypewriter = () => {
-    if (phase === 'npc_speaking' && !isTypewriterDone) {
+  // Fast forward typewriter or continue to player choices
+  const handleNpcSpeakingContinue = () => {
+    if (!isTypewriterDone) {
       setDisplayedText(dialogNode.npcDialogue);
       setIsTypewriterDone(true);
+    } else {
+      sound.playClick();
       setPhase('player_turn');
-    } else if (phase === 'npc_reacting' && !isReactionDone) {
-      setIsReactionDone(true);
     }
   };
 
-  // Keyboard navigation & selection
+  // Stop speech when component unmounts
+  useEffect(() => {
+    return () => {
+      sound.stopSpeaking();
+    };
+  }, []);
+
+  // Keyboard navigation & selection on desktop
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Escape') {
+        e.preventDefault();
+        sound.stopSpeaking();
+        onClose();
+        return;
+      }
+
       if (phase === 'free_input' || phase === 'evaluating_ai') return;
 
       if (phase === 'npc_speaking') {
         if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') {
           e.preventDefault();
-          handleSkipTypewriter();
+          handleNpcSpeakingContinue();
         }
         return;
       }
 
       if (phase === 'player_turn') {
-        // Arrow navigation or W/S
         if (e.code === 'ArrowDown' || e.code === 'KeyS') {
           e.preventDefault();
           sound.playClick();
@@ -166,7 +180,7 @@ export const RpgDialogueBox: React.FC<RpgDialogueBoxProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [phase, isTypewriterDone, isReactionDone, selectedChoiceIdx, dialogNode.options]);
+  }, [phase, isTypewriterDone, isReactionDone, selectedChoiceIdx, dialogNode.options, onClose]);
 
   // Read spoken dialogue aloud using Web Speech API
   const handleToggleAudio = () => {
@@ -235,8 +249,12 @@ export const RpgDialogueBox: React.FC<RpgDialogueBoxProps> = ({
 
   // Advance conversation after viewing NPC's reaction
   const handleAdvanceAfterReaction = () => {
-    if (!activeOption) return;
+    sound.stopSpeaking();
     sound.playClick();
+    if (!activeOption) {
+      onClose();
+      return;
+    }
     const nextId = activeOption.nextDialogNodeId || null;
     onAdvanceNode(nextId);
   };
@@ -258,168 +276,278 @@ export const RpgDialogueBox: React.FC<RpgDialogueBoxProps> = ({
     }
   };
 
+  // Restrict to max 3 choices as per Requirement 10
+  const displayedOptions = dialogNode.options.slice(0, 3);
+
   return (
     <div
-      onClick={handleSkipTypewriter}
-      className="w-full bg-[#080d1a]/95 border-2 border-slate-600/90 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.92)] p-4 sm:p-5 backdrop-blur-xl relative overflow-hidden transition-all duration-300 text-slate-100 selection:bg-amber-500 selection:text-slate-950"
+      className="w-full bg-[#080d1a]/98 border-2 border-slate-600 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.95)] p-3.5 sm:p-5 backdrop-blur-xl relative overflow-hidden transition-all duration-200 text-slate-100 max-h-[46vh] sm:max-h-[50vh] flex flex-col justify-between"
       style={{
         boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(245, 158, 11, 0.25)',
       }}
     >
       {/* Pixel decorative corner brackets */}
-      <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-t-2 border-l-2 border-amber-400" />
-      <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-t-2 border-r-2 border-amber-400" />
-      <div className="absolute bottom-1.5 left-1.5 w-2.5 h-2.5 border-b-2 border-l-2 border-amber-400" />
-      <div className="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-400" />
+      <div className="absolute top-1.5 left-1.5 w-2 h-2 border-t-2 border-l-2 border-amber-400 pointer-events-none" />
+      <div className="absolute top-1.5 right-1.5 w-2 h-2 border-t-2 border-r-2 border-amber-400 pointer-events-none" />
+      <div className="absolute bottom-1.5 left-1.5 w-2 h-2 border-b-2 border-l-2 border-amber-400 pointer-events-none" />
+      <div className="absolute bottom-1.5 right-1.5 w-2 h-2 border-b-2 border-r-2 border-amber-400 pointer-events-none" />
 
-      {/* 1. TOP HEADER: NPC IDENTITY & HIGH-CONTRAST CONTROLS */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3">
-        {/* Left: NPC Identity Tag */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base border-2 bg-slate-900 border-amber-400/60 text-amber-300 shadow-sm">
+      {/* 1. TOP BAR: SPEAKER IDENTITY & MINIMAL SECONDARY CONTROLS */}
+      <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+        {/* Speaker Name Tag */}
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm border bg-slate-900 border-amber-400/60 text-amber-300 shadow-sm shrink-0">
             {getNpcAvatar(speaker.avatarType)}
           </div>
 
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-baseline gap-1.5">
             <span className="font-black text-amber-400 text-sm sm:text-base tracking-wider uppercase font-mono">
               {speaker.name}
             </span>
-            <span className="text-xs text-slate-400 font-sans hidden sm:inline font-medium">
+            <span className="text-[11px] text-slate-400 font-sans hidden sm:inline">
               · {speaker.title}
             </span>
           </div>
         </div>
 
-        {/* Right: Clean, Game-Like Support Buttons */}
-        <div className="flex items-center gap-2 text-xs">
-          {/* Read Aloud Button */}
+        {/* Minimal Audio & Learning Support */}
+        <div className="flex items-center gap-1.5 text-xs">
+          {/* Small Audio Listen Button */}
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleToggleAudio();
-            }}
-            className={`px-2.5 py-1 rounded-lg border font-mono text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+            onClick={handleToggleAudio}
+            className={`px-2 py-1 rounded-lg border font-mono text-[11px] flex items-center gap-1 transition-all cursor-pointer ${
               isPlayingAudio
                 ? 'bg-amber-500/20 border-amber-400 text-amber-300'
-                : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
+                : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white'
             }`}
             title="Listen to pronunciation"
+            aria-label="Listen to pronunciation"
           >
-            <Volume2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">
-              {isPlayingAudio ? 'Speaking...' : 'Listen'}
-            </span>
+            <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden xs:inline">Listen</span>
           </button>
 
-          {/* Optional [ Translate ] Toggle */}
-          {dialogNode.npcDialogueCnHint && (
+          {/* Collapsible Learning Help Toggle */}
+          {(dialogNode.npcDialogueCnHint || dialogNode.hintScaffolding) && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowTranslation((prev) => !prev);
-              }}
-              className={`px-2.5 py-1 rounded-lg border font-mono text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                showTranslation
-                  ? 'bg-amber-500/20 border-amber-400 text-amber-300'
-                  : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
+              onClick={() => setShowLearningTools((prev) => !prev)}
+              className={`px-2 py-1 rounded-lg border font-mono text-[11px] flex items-center gap-1 transition-all cursor-pointer ${
+                showLearningTools
+                  ? 'bg-amber-400/20 border-amber-400 text-amber-300'
+                  : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white'
               }`}
-              title="Toggle Chinese translation"
+              title="Toggle learning help"
             >
-              <Globe className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">
-                {showTranslation ? 'Hide' : 'Translate'}
-              </span>
+              <span>+ Help</span>
+              {showLearningTools ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             </button>
           )}
 
-          {/* Optional [ Hint ] Toggle */}
-          {dialogNode.hintScaffolding && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowHint((prev) => !prev);
-              }}
-              className={`px-2.5 py-1 rounded-lg border font-mono text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                showHint
-                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
-                  : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-              title="Get in-story hint"
-            >
-              <Lightbulb className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Hint</span>
-            </button>
-          )}
-
-          {/* Walk Away / Close Dialogue */}
+          {/* Close / Walk Away */}
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-            title="Close dialogue"
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+            title="Leave conversation"
+            aria-label="Close dialogue"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* 2. ON-DEMAND HINT BUBBLE (Subtle contextual prompt) */}
-      {showHint && dialogNode.hintScaffolding && (
-        <div className="mb-3 px-3.5 py-2.5 rounded-xl bg-emerald-950/50 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm flex items-start gap-2.5 animate-in fade-in duration-200 font-sans">
-          <span className="text-emerald-400 font-bold shrink-0 font-mono">💡 HINT:</span>
-          <div className="flex-1 leading-relaxed">
-            <span>{dialogNode.hintScaffolding.level1Cn}</span>
-            {dialogNode.hintScaffolding.level2Starter && (
-              <div className="text-xs text-emerald-400/90 mt-1 font-mono">
-                Try: "{dialogNode.hintScaffolding.level2Starter}"
-              </div>
+      {/* 2. OPTIONAL COLLAPSIBLE LEARNING SUPPORT PANEL (Progressive Disclosure) */}
+      {showLearningTools && (
+        <div className="mb-2 p-2.5 rounded-xl bg-slate-900/90 border border-slate-700 text-xs space-y-2 animate-in fade-in duration-150 font-sans">
+          <div className="flex items-center gap-2">
+            {/* On-Demand Translation Toggle */}
+            {dialogNode.npcDialogueCnHint && (
+              <button
+                onClick={() => setShowTranslation((prev) => !prev)}
+                className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono flex items-center gap-1 transition-all cursor-pointer ${
+                  showTranslation
+                    ? 'bg-amber-500/20 border-amber-400 text-amber-300'
+                    : 'bg-slate-950 border-slate-750 text-slate-300'
+                }`}
+              >
+                <Globe className="w-3 h-3" />
+                <span>{showTranslation ? 'Hide Translation' : 'Translate'}</span>
+              </button>
+            )}
+
+            {/* In-Game Contextual Hint Toggle */}
+            {dialogNode.hintScaffolding && (
+              <button
+                onClick={() => setShowHint((prev) => !prev)}
+                className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono flex items-center gap-1 transition-all cursor-pointer ${
+                  showHint
+                    ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                    : 'bg-slate-950 border-slate-750 text-slate-300'
+                }`}
+              >
+                <Lightbulb className="w-3 h-3" />
+                <span>{showHint ? 'Hide Hint' : 'Hint'}</span>
+              </button>
             )}
           </div>
+
+          {/* Translation content */}
+          {showTranslation && dialogNode.npcDialogueCnHint && (
+            <div className="text-xs text-slate-300 italic pt-1 border-t border-slate-800 font-sans">
+              "{dialogNode.npcDialogueCnHint}"
+            </div>
+          )}
+
+          {/* Hint content */}
+          {showHint && dialogNode.hintScaffolding && (
+            <div className="text-xs text-emerald-300 pt-1 border-t border-slate-800 font-sans">
+              💡 {dialogNode.hintScaffolding.level1Cn}
+              {dialogNode.hintScaffolding.level2Starter && (
+                <div className="text-[11px] text-emerald-200 mt-0.5 font-mono">
+                  Try starting with: "{dialogNode.hintScaffolding.level2Starter}"
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* 3. MAIN DIALOGUE CONTENT AREA */}
-      <div className="space-y-3">
-        {/* A. If in Speaking or Choice Phase: Show NPC's line with LARGE READABLE TYPOGRAPHY */}
-        {(phase === 'npc_speaking' || phase === 'player_turn' || phase === 'free_input') && (
-          <div className="space-y-1.5">
-            <p className="text-base sm:text-lg text-white font-sans font-medium leading-relaxed tracking-wide">
-              "{displayedText}"
-              {!isTypewriterDone ? (
-                <span className="inline-block w-2 h-4 bg-amber-400 ml-1.5 animate-pulse align-middle" />
-              ) : (
-                <span className="inline-block text-amber-400 text-sm ml-2 animate-bounce align-middle font-mono">
-                  ▼
-                </span>
-              )}
-            </p>
-
-            {/* Optional On-Demand Chinese Translation */}
-            {showTranslation && dialogNode.npcDialogueCnHint && (
-              <p className="text-xs sm:text-sm text-slate-400 italic font-sans leading-relaxed pt-0.5 animate-in fade-in duration-200">
-                "{dialogNode.npcDialogueCnHint}"
+      {/* 3. MAIN DIALOGUE CONTENT AREA (Scrollable if needed, bottom docked) */}
+      <div className="flex-1 overflow-y-auto pr-0.5">
+        {/* STEP 1: NPC SPEAKS (Large, highly readable typography) */}
+        {phase === 'npc_speaking' && (
+          <div className="space-y-3 animate-in fade-in duration-150">
+            <div
+              onClick={handleNpcSpeakingContinue}
+              className="cursor-pointer space-y-1.5 py-1"
+            >
+              <p className="text-base sm:text-lg text-white font-sans font-medium leading-relaxed tracking-wide">
+                "{displayedText}"
+                {!isTypewriterDone ? (
+                  <span className="inline-block w-2 h-4 bg-amber-400 ml-1.5 animate-pulse align-middle" />
+                ) : (
+                  <span className="inline-block text-amber-400 text-xs ml-2 animate-bounce align-middle font-mono">
+                    ▼
+                  </span>
+                )}
               </p>
-            )}
+            </div>
+
+            {/* Prominent Continue Button (Min 48px Touch Target) */}
+            <div className="flex justify-end pt-1">
+              <button
+                onClick={handleNpcSpeakingContinue}
+                className="w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-sm font-mono flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg"
+              >
+                <span>{isTypewriterDone ? 'Continue' : 'Skip'}</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
 
-        {/* B. Evaluating AI Free Response: Game-like thinking state */}
+        {/* STEP 2: PLAYER TURN ("What do you want to say?") */}
+        {phase === 'player_turn' && (
+          <div className="space-y-2 animate-in fade-in duration-150">
+            <div className="text-[11px] font-mono font-bold text-amber-400 uppercase tracking-wider">
+              WHAT DO YOU WANT TO SAY?
+            </div>
+
+            <div className="space-y-1.5">
+              {displayedOptions.map((option, idx) => {
+                const isSelected = selectedChoiceIdx === idx;
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => handleSelectOption(option)}
+                    onMouseEnter={() => setSelectedChoiceIdx(idx)}
+                    className={`w-full min-h-[48px] flex items-center gap-3 p-3 rounded-2xl transition-all text-left cursor-pointer active:scale-[0.99] ${
+                      isSelected
+                        ? 'bg-amber-950/50 border-2 border-amber-400 text-amber-100 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                        : 'bg-slate-900/70 border border-slate-800 text-slate-200 hover:text-white hover:bg-slate-850'
+                    }`}
+                  >
+                    <span
+                      className={`font-mono font-black text-sm shrink-0 ${
+                        isSelected ? 'text-amber-400' : 'text-slate-500'
+                      }`}
+                    >
+                      {isSelected ? '▶' : ' '}
+                    </span>
+                    <span className="text-sm sm:text-base font-sans font-medium leading-snug flex-1">
+                      "{option.englishText}"
+                    </span>
+                  </button>
+                );
+              })}
+
+              {/* [ Say it yourself ] Option Button */}
+              <button
+                onClick={() => {
+                  setPhase('free_input');
+                  setTimeout(() => inputRef.current?.focus(), 60);
+                }}
+                className="w-full min-h-[44px] flex items-center justify-between px-3 py-2 rounded-2xl bg-slate-900/40 hover:bg-slate-850 border border-dashed border-slate-700 hover:border-amber-400/60 text-xs sm:text-sm text-slate-300 hover:text-amber-300 transition-all cursor-pointer font-mono"
+              >
+                <span>[ ⌨️ Say it yourself ]</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3: DEDICATED FREE SPEECH / CUSTOM INPUT STATE */}
+        {phase === 'free_input' && (
+          <form
+            onSubmit={handleFreeSubmit}
+            className="space-y-2.5 animate-in fade-in duration-150 py-1"
+          >
+            <div className="flex items-center justify-between text-xs text-slate-400 uppercase tracking-wider font-mono font-bold">
+              <span>SPEAK IN NATURAL ENGLISH</span>
+              <button
+                type="button"
+                onClick={() => setPhase('player_turn')}
+                className="text-amber-400 hover:text-amber-300 cursor-pointer font-bold"
+              >
+                ← Back to choices
+              </button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={freeText}
+                onChange={(e) => setFreeText(e.target.value)}
+                placeholder={`Tell ${speaker.name} what you need...`}
+                className="w-full min-h-[48px] bg-slate-900 border-2 border-slate-700 rounded-2xl px-3.5 py-2 text-sm sm:text-base font-sans text-white focus:outline-none focus:border-amber-400 placeholder:text-slate-500"
+              />
+              <button
+                type="submit"
+                disabled={!freeText.trim()}
+                className="min-h-[48px] px-6 py-2 rounded-2xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-black text-xs font-mono flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-md active:scale-95"
+              >
+                <span>SEND</span>
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* STEP 4: EVALUATING AI FREE RESPONSE */}
         {phase === 'evaluating_ai' && (
-          <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-700 flex items-center gap-3 text-xs sm:text-sm text-slate-200 animate-pulse font-sans">
+          <div className="min-h-[60px] p-4 rounded-2xl bg-slate-900/80 border border-slate-700 flex items-center gap-3 text-sm text-slate-200 animate-pulse font-sans">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping shrink-0" />
             <span>{speaker.name} is listening to what you said...</span>
           </div>
         )}
 
-        {/* C. Reaction Phase: Show Player's speech & NPC's immediate spoken reply */}
+        {/* STEP 5: REACTION PHASE (NPC replies & confirms) */}
         {phase === 'npc_reacting' && activeOption && (
-          <div className="space-y-3 animate-in fade-in duration-200">
+          <div className="space-y-3 animate-in fade-in duration-150">
             {/* Player's speech echo */}
-            <div className="flex items-start gap-2.5 text-xs sm:text-sm text-amber-200 bg-amber-950/30 border-l-4 border-amber-400 px-3.5 py-2 rounded-r-xl font-sans leading-relaxed">
+            <div className="flex items-start gap-2 text-xs text-amber-200 bg-amber-950/30 border-l-4 border-amber-400 px-3 py-1.5 rounded-r-xl font-sans leading-relaxed">
               <span className="text-amber-400 font-mono font-black shrink-0">YOU:</span>
-              <span>"{activeOption.englishText}"</span>
+              <span className="truncate">"{activeOption.englishText}"</span>
             </div>
 
             {/* NPC's immediate spoken reply */}
@@ -431,139 +559,40 @@ export const RpgDialogueBox: React.FC<RpgDialogueBoxProps> = ({
                 )}
               </p>
 
-              {/* Optional Subtle AI Polish Alternative */}
+              {/* Gentle Natural Alternative Tip (no score penalty) */}
               {aiAlternative && (
-                <div className="text-xs sm:text-sm font-sans text-sky-200 bg-sky-950/40 border border-sky-400/30 px-3 py-2 rounded-xl flex items-center gap-2">
+                <div className="text-xs font-sans text-sky-200 bg-sky-950/40 border border-sky-400/30 px-3 py-1.5 rounded-xl flex items-center gap-2">
                   <span className="font-bold text-sky-400 shrink-0 font-mono">💡 More natural:</span>
                   <span className="italic">"{aiAlternative}"</span>
                 </div>
               )}
 
-              {/* Brief Reward Micro-Feedback */}
-              <div className="flex items-center gap-3 pt-1 text-xs">
+              {/* Reward Feedback */}
+              <div className="flex items-center gap-3 text-xs">
                 {displayedXp > 0 && (
-                  <span className="inline-flex items-center gap-1.5 text-amber-400 font-bold font-mono">
+                  <span className="inline-flex items-center gap-1 text-amber-400 font-bold font-mono">
                     <Sparkles className="w-3.5 h-3.5" /> +{displayedXp} XP
                   </span>
                 )}
                 {activeOption.itemReward && (
-                  <span className="inline-flex items-center gap-1.5 text-emerald-300 font-bold font-sans">
+                  <span className="inline-flex items-center gap-1 text-emerald-300 font-bold font-sans">
                     🎫 {activeOption.itemReward.name}
                   </span>
                 )}
               </div>
             </div>
 
-            {/* Advance button */}
-            {isReactionDone && (
-              <div className="pt-2 flex justify-end">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAdvanceAfterReaction();
-                  }}
-                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm font-mono flex items-center gap-2 transition-all cursor-pointer shadow-lg active:scale-95"
-                >
-                  <span>Continue</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 4. PLAYER RESPONSES (Clean RPG Choices with dominant selected choice) */}
-        {phase === 'player_turn' && (
-          <div className="pt-2.5 border-t border-slate-800 space-y-2 animate-in fade-in duration-200">
-            <div className="space-y-2">
-              {dialogNode.options.map((option, idx) => {
-                const isSelected = selectedChoiceIdx === idx;
-                return (
-                  <button
-                    key={option.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSelectOption(option);
-                    }}
-                    onMouseEnter={() => setSelectedChoiceIdx(idx)}
-                    className={`w-full flex items-start gap-3 p-3 rounded-xl transition-all text-left cursor-pointer ${
-                      isSelected
-                        ? 'bg-amber-950/50 border-2 border-amber-400 text-amber-100 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
-                        : 'bg-slate-900/60 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-                    }`}
-                  >
-                    <span
-                      className={`font-mono font-black text-sm shrink-0 mt-0.5 ${
-                        isSelected ? 'text-amber-400' : 'text-slate-500'
-                      }`}
-                    >
-                      {isSelected ? '▶' : ' '}
-                    </span>
-                    <span className="text-sm sm:text-[15px] font-sans font-medium leading-relaxed flex-1">
-                      "{option.englishText}"
-                    </span>
-                  </button>
-                );
-              })}
-
-              {/* [ Say it yourself ] Option Button */}
+            {/* Advance / Finish Button (Min 48px Touch Target, always accessible) */}
+            <div className="pt-1 flex justify-end">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setPhase('free_input');
-                  setTimeout(() => inputRef.current?.focus(), 50);
-                }}
-                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-900/40 hover:bg-slate-850 border border-dashed border-slate-700 hover:border-amber-400/60 text-xs sm:text-sm text-slate-400 hover:text-amber-300 transition-all cursor-pointer font-mono"
+                onClick={handleAdvanceAfterReaction}
+                className="w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm font-mono flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-lg active:scale-95"
               >
-                <span>[ Say it yourself ]</span>
+                <span>{activeOption.nextDialogNodeId ? 'Continue' : 'Finish & Close'}</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
-
-            {/* Bottom Keyboard Hint */}
-            <div className="flex justify-end pt-1 text-[11px] font-mono text-slate-500">
-              <span>Use ↑ / ↓ to choose · [ E ] or Enter to Select</span>
-            </div>
           </div>
-        )}
-
-        {/* 5. FREE SPEECH / CUSTOM INPUT MODE */}
-        {phase === 'free_input' && (
-          <form
-            onSubmit={handleFreeSubmit}
-            onClick={(e) => e.stopPropagation()}
-            className="pt-2.5 border-t border-slate-800 space-y-2.5 animate-in fade-in duration-200"
-          >
-            <div className="flex items-center justify-between text-xs text-slate-400 uppercase tracking-wider font-mono font-bold">
-              <span>WHAT DO YOU WANT TO SAY?</span>
-              <button
-                type="button"
-                onClick={() => setPhase('player_turn')}
-                className="text-amber-400 hover:text-amber-300 cursor-pointer font-bold"
-              >
-                ← Back to choices
-              </button>
-            </div>
-
-            <div className="flex gap-2">
-              <input
-                ref={inputRef}
-                type="text"
-                value={freeText}
-                onChange={(e) => setFreeText(e.target.value)}
-                placeholder={`Speak to ${speaker.name} in English...`}
-                className="flex-1 bg-slate-900 border-2 border-slate-700 rounded-xl px-3.5 py-2.5 text-sm sm:text-base font-sans text-white focus:outline-none focus:border-amber-400 placeholder:text-slate-500"
-              />
-              <button
-                type="submit"
-                disabled={!freeText.trim()}
-                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-black text-xs sm:text-sm flex items-center gap-2 transition-all cursor-pointer shrink-0 shadow-md font-mono"
-              >
-                <span>SEND</span>
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
-          </form>
         )}
       </div>
     </div>

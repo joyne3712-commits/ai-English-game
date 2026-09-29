@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { InventoryItem } from '../types';
 import { sound } from '../services/soundService';
-import { Trophy, Sparkles, Coins, Volume2, RotateCcw, ArrowRight, Plane, CheckCircle2, Bookmark } from 'lucide-react';
+import { Trophy, Sparkles, Coins, Volume2, RotateCcw, ArrowRight, Plane, CheckCircle2, Bookmark, Lock, Coffee, Hotel, ShieldCheck, MapPin } from 'lucide-react';
 
 interface MissionCompleteScreenProps {
   score: number;
@@ -21,37 +21,47 @@ export const MissionCompleteScreen: React.FC<MissionCompleteScreenProps> = ({
   onRestart,
 }) => {
   const [playingPhrase, setPlayingPhrase] = useState<string | null>(null);
+  const [showChapter2Preview, setShowChapter2Preview] = useState<boolean>(false);
+
+  // Identify player's choices from inventory
+  const isWindowSeat = inventory.some((item) => item.name.includes('14A') || item.name.includes('Window'));
+  const isAisleSeat = inventory.some((item) => item.name.includes('14C') || item.name.includes('Aisle'));
+  const selectedFlightName = inventory.some((item) => item.id === 'flight_rebook_slip_31')
+    ? 'UA937 (23:10 Departure · Gate 31)'
+    : 'UA921 (21:30 Express · Gate 22)';
+  const hasCoffee = inventory.some((item) => item.id.includes('coffee') || item.id.includes('latte'));
+  const hasSouvenir = inventory.some((item) => item.id.includes('banana') || item.id.includes('eyemask'));
 
   const expressionsMastered = [
     {
-      en: "Excuse me, could you help me with this?",
-      cn: "打扰一下，你能帮我处理一下这个情况吗？",
-      note: "万能高情商破冰求助句块",
-    },
-    {
-      en: "Was it due to weather or a mechanical issue?",
-      cn: "这是由于天气原因还是机械故障？",
-      note: "切入航司责任归属的核心句",
+      en: "My connecting flight was cancelled.",
+      cn: "我的转机航班被取消了。",
+      note: "地勤柜台沟通的核心起手句，快速说明自身遭遇",
     },
     {
       en: "What are my options for rebooking?",
-      cn: "请问改签有哪些方案可供选择？",
-      note: "差旅必备，迅速索取所有备选航班",
+      cn: "请问改签有哪些备选航班？",
+      note: "差旅必备，索取航司所有可用的替代航线",
     },
     {
-      en: "Will my checked bags transfer automatically?",
+      en: "What's the difference between the two flights?",
+      cn: "这两趟备选航班有什么区别？",
+      note: "权衡时间宽裕度与目的地到达时间的实用对比句",
+    },
+    {
+      en: "Will my checked baggage transfer automatically?",
       cn: "我的托运行李会自动转运直挂吗？",
-      note: "转机必备，核实中途是否需要提取行李",
+      note: "国际转机核心关切，确认中途是否需要取行李",
     },
     {
-      en: "Since this was due to maintenance, does the airline provide meal vouchers?",
-      cn: "鉴于延误是由于机械维护，请问航司是否提供餐饮代金券？",
-      note: "有理有据争取权益与补偿的高阶模板",
+      en: "Could I get a coffee? What do you recommend?",
+      cn: "我能点杯咖啡吗？请问有什么推荐？",
+      note: "候机厅咖啡厅自由点单与破冰闲聊必备表达",
     },
     {
-      en: "Could you just confirm the gate number and boarding time?",
-      cn: "能否帮我确认一下登机口编号和登机时间？",
-      note: "离台收官核实，杜绝走错航站楼",
+      en: "Excuse me, my digital boarding pass isn't loading.",
+      cn: "打扰一下，我的电子登机牌加载不出来。",
+      note: "登机口遭遇 App 故障时，向登机口地勤求助打印纸质票",
     },
   ];
 
@@ -64,98 +74,109 @@ export const MissionCompleteScreen: React.FC<MissionCompleteScreenProps> = ({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto bg-slate-900 border-2 border-amber-500/60 rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6 animate-in zoom-in-95 duration-300">
-      {/* Header Fanfare */}
-      <div className="text-center space-y-3 pb-6 border-b border-slate-800">
-        <div className="inline-flex p-3 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-400/50 shadow-[0_0_30px_rgba(245,158,11,0.3)]">
+    <div className="w-full max-w-4xl mx-auto bg-[#0b101b] border-2 border-amber-500/80 rounded-3xl shadow-[0_25px_80px_rgba(245,158,11,0.25)] p-6 sm:p-8 space-y-6 animate-in zoom-in-95 duration-300 font-mono text-slate-100 select-none">
+      {/* 1. Header Fanfare & Chapter Victory Banner */}
+      <div className="text-center space-y-3 pb-6 border-b border-slate-800 relative">
+        <div className="inline-flex p-3 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-400/50 shadow-[0_0_30px_rgba(245,158,11,0.3)] animate-bounce-short">
           <Trophy className="w-10 h-10" />
         </div>
         <div className="text-xs font-mono text-amber-400 uppercase tracking-widest">
-          MISSION 01 · VICTORY
+          NINGBO ➔ TOKYO ➔ SAN FRANCISCO · MISSION COMPLETE
         </div>
-        <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-          ✈️ 登机口 B22 开启 · 任务圆满达成！
-        </h2>
-        <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto leading-relaxed">
-          你凭借纯正得体的英语，从容化解了航班突发取消的重大危机，拿到了今晚经西雅图直奔旧金山的新登机牌与餐饮补偿！
+        <h1 className="text-3xl sm:text-5xl font-black text-white tracking-wider">
+          CHAPTER 01 · THE CONNECTION
+        </h1>
+        <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto leading-relaxed font-sans font-medium">
+          🎉 恭喜！你独自一人在东京成功应对了国际航班突发取消、备选航班抉择、行李直挂确认与登机牌故障，顺利登上了飞往旧金山的客机！
         </p>
 
         {/* Stats Grid */}
         <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
-          <div className="px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-2 text-xs font-mono">
+          <div className="px-4 py-2 rounded-2xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs">
             <Sparkles className="w-4 h-4 text-amber-400" />
-            <span className="text-slate-400">总经验：</span>
-            <span className="text-base font-bold text-amber-300">{xp} XP</span>
+            <span className="text-slate-400">旅行经验:</span>
+            <span className="text-base font-bold text-amber-300">+{xp} XP</span>
           </div>
 
-          <div className="px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-2 text-xs font-mono">
+          <div className="px-4 py-2 rounded-2xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs">
             <Coins className="w-4 h-4 text-emerald-400" />
-            <span className="text-slate-400">结余资金：</span>
+            <span className="text-slate-400">剩余资金:</span>
             <span className="text-base font-bold text-emerald-300">${money}</span>
           </div>
 
-          <div className="px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-2 text-xs font-mono">
-            <span className="text-slate-400">社交精力：</span>
+          <div className="px-4 py-2 rounded-2xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs">
+            <span className="text-slate-400">精力值:</span>
             <span className="text-base font-bold text-rose-400">{hp}%</span>
           </div>
         </div>
       </div>
 
-      {/* Boarding Pass Hero Card */}
-      <div className="p-5 rounded-2xl bg-gradient-to-r from-sky-950 via-slate-900 to-indigo-950 border border-sky-500/50 shadow-xl space-y-3">
+      {/* 2. Your Travel Decision Log (Sims-style choices summary) */}
+      <div className="p-5 rounded-2xl bg-gradient-to-r from-sky-950/80 via-slate-900 to-indigo-950/80 border border-sky-500/50 shadow-xl space-y-3">
         <div className="flex items-center justify-between border-b border-sky-800/40 pb-2 text-xs">
-          <span className="px-2 py-0.5 rounded bg-sky-600 text-white font-mono font-bold">
-            CONFIRMED BOARDING PASS
+          <span className="px-2.5 py-0.5 rounded-full bg-sky-600 text-white font-bold tracking-wider">
+            YOUR TRIP SUMMARY · 行程抉择回顾
           </span>
-          <span className="font-mono text-sky-300">UNITED AIRLINES · SEATTLE CONNECTION</span>
+          <span className="text-sky-300">UNITED AIRLINES ➔ SFO</span>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-4 py-2">
-          <div>
-            <div className="text-[10px] text-slate-400 uppercase font-mono">From</div>
-            <div className="text-lg font-black text-white">PACIFIC RIM (TERMINAL 2)</div>
-            <span className="text-xs text-amber-400 font-mono">Gate B22 · Boarding 20:50</span>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
+          <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+            <div className="text-[10px] text-slate-400 uppercase">Selected Flight</div>
+            <div className="text-sm font-bold text-amber-300">{selectedFlightName}</div>
           </div>
-          <div className="text-2xl text-sky-400 font-bold">✈️</div>
-          <div>
-            <div className="text-[10px] text-slate-400 uppercase font-mono">To Final Destination</div>
-            <div className="text-lg font-black text-white">SAN FRANCISCO (SFO)</div>
-            <span className="text-xs text-emerald-400 font-mono">Arriving Tonight 23:45 PST</span>
+
+          <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+            <div className="text-[10px] text-slate-400 uppercase">Assigned Seat</div>
+            <div className="text-sm font-bold text-emerald-400">
+              {isWindowSeat ? 'Seat 14A (Window · Pacific View)' : isAisleSeat ? 'Seat 14C (Aisle · Easy Legroom)' : 'Seat 14A (Confirmed)'}
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+            <div className="text-[10px] text-slate-400 uppercase">Baggage & Hotel</div>
+            <div className="text-sm font-bold text-sky-300">Auto-Transfer / Sunset Hotel</div>
           </div>
         </div>
       </div>
 
-      {/* Expressions Unlocked in Phrasebook */}
+      {/* 3. Expressions Unlocked in Phrasebook */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
             <Bookmark className="w-4 h-4" />
-            <span>本章冒险收录的地道口语技能 ({expressionsMastered.length})</span>
+            <span>✈️ 本章旅行生存短语录 (Travel Expressions Archive) ({expressionsMastered.length})</span>
           </div>
-          <span className="text-xs text-slate-500">点击喇叭可随身磨耳朵</span>
+          <span className="text-xs text-slate-400">点击 🔊 听地道发音</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
           {expressionsMastered.map((exp, idx) => {
             const isPlaying = playingPhrase === exp.en;
             return (
               <div
                 key={idx}
-                className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-start justify-between gap-3 group hover:border-slate-700 transition-colors"
+                className="p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors flex items-start justify-between gap-3 group"
               >
-                <div className="space-y-0.5">
-                  <div className="text-xs font-bold text-white font-mono leading-tight">
+                <div className="space-y-1">
+                  <div className="text-xs sm:text-sm font-bold text-white leading-snug">
                     "{exp.en}"
                   </div>
-                  <div className="text-[11px] text-sky-300">{exp.cn}</div>
-                  <div className="text-[10px] text-slate-400 italic">{exp.note}</div>
+                  <div className="text-xs text-sky-300 font-sans font-medium">{exp.cn}</div>
+                  <div className="text-[10px] text-slate-500 font-sans italic">{exp.note}</div>
                 </div>
 
                 <button
                   onClick={() => handleSpeak(exp.en)}
-                  className="p-1.5 rounded-lg bg-slate-850 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 shrink-0 cursor-pointer"
-                  title="朗读发音"
+                  className={`p-2 rounded-xl border shrink-0 transition-colors cursor-pointer ${
+                    isPlaying
+                      ? 'bg-amber-400 text-slate-950 border-amber-300'
+                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800'
+                  }`}
+                  aria-label={`Listen to "${exp.en}"`}
+                  title="Play Authentic Audio"
                 >
-                  <Volume2 className={`w-3.5 h-3.5 ${isPlaying ? 'text-sky-400 animate-pulse' : ''}`} />
+                  <Volume2 className="w-4 h-4" />
                 </button>
               </div>
             );
@@ -163,23 +184,71 @@ export const MissionCompleteScreen: React.FC<MissionCompleteScreenProps> = ({
         </div>
       </div>
 
-      {/* Bottom Footer Actions */}
-      <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <span className="text-xs text-slate-400">
-          🎮 第一章【机场突围】通关！后续章节（海关问询、酒店入住、餐厅突发）即将启程。
-        </span>
-
+      {/* 4. Action Buttons (Replay, Sneak Peek Chapter 2, Next Chapter) */}
+      <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={() => {
             sound.playClick();
             onRestart();
           }}
-          className="w-full sm:w-auto px-6 py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-medium text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-95 transition-all"
+          className="px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs sm:text-sm font-bold tracking-wider uppercase transition-all flex items-center gap-2 border border-slate-700 cursor-pointer"
         >
           <RotateCcw className="w-4 h-4" />
-          <span>重新探索机场关卡 (Replay)</span>
+          <span>PLAY CHAPTER 01 AGAIN</span>
+        </button>
+
+        <button
+          onClick={() => {
+            sound.playItemGet();
+            setShowChapter2Preview(true);
+          }}
+          className="px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 active:scale-95 text-slate-950 font-black text-xs sm:text-sm tracking-wider uppercase transition-all flex items-center gap-2 shadow-[0_10px_25px_rgba(245,158,11,0.35)] cursor-pointer"
+        >
+          <span>PREVIEW CHAPTER 02: THE WRONG HOTEL</span>
+          <ArrowRight className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Chapter 02 Sneak Peek Modal */}
+      {showChapter2Preview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-[#0b101b] border-2 border-amber-400 rounded-3xl p-6 sm:p-7 space-y-4 shadow-2xl relative text-slate-100">
+            <div className="text-center space-y-2 pb-3 border-b border-slate-800">
+              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30">
+                NEXT ADVENTURE
+              </span>
+              <h3 className="text-xl sm:text-2xl font-black text-white tracking-wider">
+                CHAPTER 02 · THE WRONG HOTEL
+              </h3>
+              <p className="text-xs text-sky-300 font-sans">
+                San Francisco, 23:45 PM · Downtown Geary Street
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs sm:text-sm space-y-2.5 font-sans leading-relaxed text-slate-300">
+              <p>
+                You step out of the San Francisco airport taxi into the cool Pacific night fog.
+              </p>
+              <p>
+                You walk into the lobby of <strong className="text-amber-300">Sunset Hotel</strong>, hand over your passport, but the front desk clerk frowns at the computer:
+              </p>
+              <p className="text-rose-400 font-semibold italic">
+                "I'm sorry, we have no record of your reservation under this name tonight..."
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                sound.playClick();
+                setShowChapter2Preview(false);
+              }}
+              className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              CLOSE PREVIEW
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -30,9 +30,10 @@ function getGeminiApiKey(): string | null {
 }
 
 /**
- * Intelligent contextual fallback evaluation engine.
- * Understands traveler intent, handles colloquial phrasing, grammatical slips,
- * generates authentic in-character NPC replies FIRST, and provides a natural phrasing tip.
+ * Intelligent contextual evaluation engine.
+ * Understands traveler intent, handles colloquial phrasing and grammatical slips,
+ * generates authentic in-character NPC replies FIRST, and provides a gentle natural phrasing tip.
+ * Prioritizes: 1. Meaning & Communication, 2. Story Progression, 3. Naturalness.
  */
 function localContextualEvaluation(
   playerInput: string,
@@ -45,65 +46,99 @@ function localContextualEvaluation(
   // Find best semantic option from current dialogue choices
   const naturalOpt = dialogNode.options.find((o) => o.toneQuality === 'natural') || dialogNode.options[0];
   const acceptableOpt = dialogNode.options.find((o) => o.toneQuality === 'acceptable') || naturalOpt;
-  const isQuestion = input.includes('?');
 
-  // Check specific character scenarios
+  // 1. SARAH (Passenger Service)
   if (speaker.id === 'sarah') {
-    // Player asking Sarah for help with cancelled flight / rebooking
-    if (lower.includes('cancel') || lower.includes('flight') || lower.includes('help') || lower.includes('problem') || lower.includes('sfo')) {
-      let alternative: string | undefined;
-      if (lower.includes('where') && !lower.includes('where is')) {
-        alternative = "My flight was cancelled. Could you help me find another one?";
-      } else if (lower.includes('i want to') || lower.includes('give me')) {
-        alternative = "Excuse me, my flight just got cancelled. What are my options?";
+    // Choosing 21:30 / UA921 / Gate 22 / Earlier
+    if (lower.includes('21:30') || lower.includes('2130') || lower.includes('921') || lower.includes('gate 22') || lower.includes('early') || lower.includes('first')) {
+      const g22Opt = dialogNode.options.find((o) => o.id.includes('921') || o.id.includes('22')) || naturalOpt;
+      return {
+        understood: true,
+        npcReply: "Got it! Let's get you confirmed on UA921 at 21:30 from Gate 22.",
+        naturalAlternative: "I'll take the 21:30 flight (UA921).",
+        xpGain: 30,
+        matchedOption: g22Opt,
+        nextDialogNodeId: 'sarah_confirm_gate22',
+        completesGoalId: 'obj_find_replacement',
+      };
+    }
+
+    // Choosing 23:10 / UA937 / Gate 31 / Later
+    if (lower.includes('23:10') || lower.includes('2310') || lower.includes('937') || lower.includes('gate 31') || lower.includes('later') || lower.includes('relax') || lower.includes('rush')) {
+      const g31Opt = dialogNode.options.find((o) => o.id.includes('937') || o.id.includes('31')) || naturalOpt;
+      return {
+        understood: true,
+        npcReply: "Sounds good! The 23:10 flight (UA937) from Gate 31 gives you plenty of buffer time.",
+        naturalAlternative: "I'd prefer the 23:10 flight (UA937).",
+        xpGain: 30,
+        matchedOption: g31Opt,
+        nextDialogNodeId: 'sarah_confirm_gate31',
+        completesGoalId: 'obj_find_replacement',
+      };
+    }
+
+    // Asking about difference between flights
+    if (lower.includes('diff') || lower.includes('which') || lower.includes('better') || lower.includes('compare')) {
+      return {
+        understood: true,
+        npcReply: "Sure thing, let me compare both options for you.",
+        naturalAlternative: "What's the difference between the two flights?",
+        xpGain: 20,
+        matchedOption: naturalOpt,
+        nextDialogNodeId: 'sarah_compare',
+      };
+    }
+
+    // Asking about luggage
+    if (lower.includes('bag') || lower.includes('luggage') || lower.includes('suitcase')) {
+      return {
+        understood: true,
+        npcReply: "If your bag was checked through from Ningbo, it will transfer automatically to your replacement flight to San Francisco.",
+        naturalAlternative: "Will my checked baggage transfer automatically?",
+        xpGain: 25,
+        matchedOption: naturalOpt,
+        nextDialogNodeId: 'sarah_options',
+      };
+    }
+
+    // Explaining flight cancellation / asking for help
+    if (lower.includes('cancel') || lower.includes('flight') || lower.includes('help') || lower.includes('problem') || lower.includes('sfo') || lower.includes('san francisco') || lower.includes('connecting')) {
+      let alt: string | undefined;
+      if (lower.includes('my flight cancel') || lower.includes('flight is bad')) {
+        alt = "My connecting flight was cancelled. Could you help me find another one?";
       }
 
       return {
         understood: true,
-        npcReply: "Yeah, I'm sorry about that. Let me see what I can find for you.",
-        naturalAlternative: alternative,
+        npcReply: "Yeah, I've seen a few cancellations tonight. Let me see what alternative flights are available.",
+        naturalAlternative: alt,
         xpGain: 25,
         matchedOption: naturalOpt,
-        nextDialogNodeId: naturalOpt.nextDialogNodeId || 'sarah_check_computer',
-        completesGoalId: naturalOpt.completesGoalId,
+        nextDialogNodeId: 'sarah_options',
+        completesGoalId: 'obj_figure_out',
       };
     }
+  }
 
-    if (lower.includes('thank') || lower.includes('ok') || lower.includes('great') || lower.includes('gate 22')) {
+  // 2. MIKE (Cafe Barista)
+  if (speaker.id === 'barista') {
+    if (lower.includes('flight') || lower.includes('cancel') || lower.includes('lost') || lower.includes('help') || lower.includes('desk') || lower.includes('sarah')) {
       return {
         understood: true,
-        npcReply: "No problem at all! Safe travels to San Francisco.",
+        npcReply: "Bummer about your flight. Head over to Counter B right across the hall—Sarah will sort you out.",
+        naturalAlternative: "My flight just got cancelled. Do you know where I can get help?",
         xpGain: 20,
         matchedOption: naturalOpt,
         nextDialogNodeId: naturalOpt.nextDialogNodeId,
-        completesGoalId: naturalOpt.completesGoalId || 'obj_find_help',
-      };
-    }
-  }
-
-  if (speaker.id === 'barista') {
-    // Mike the Cafe Barista
-    if (lower.includes('flight') || lower.includes('lost') || lower.includes('help') || lower.includes('desk') || lower.includes('sarah')) {
-      let alt: string | undefined;
-      if (lower.includes('where is desk') || lower.includes('where desk')) {
-        alt = "Do you know where the passenger service desk is?";
-      }
-
-      return {
-        understood: true,
-        npcReply: "Yeah, man. Try Counter B right across the hall. Sarah will take care of you.",
-        naturalAlternative: alt,
-        xpGain: 15,
-        matchedOption: naturalOpt,
-        nextDialogNodeId: naturalOpt.nextDialogNodeId,
-        completesGoalId: naturalOpt.completesGoalId,
+        completesGoalId: 'obj_figure_out',
       };
     }
 
-    if (lower.includes('coffee') || lower.includes('latte') || lower.includes('americano') || lower.includes('drink')) {
+    if (lower.includes('coffee') || lower.includes('drink') || lower.includes('americano') || lower.includes('latte')) {
       return {
         understood: true,
-        npcReply: "You got it! Fresh iced Americano on the house. Hang in there with your flight!",
+        npcReply: "You got it! Fresh iced Americano on the house. Hang in there!",
+        naturalAlternative: "Could I get a quick iced Americano while I sort this out?",
         xpGain: 15,
         matchedOption: naturalOpt,
         nextDialogNodeId: naturalOpt.nextDialogNodeId,
@@ -111,65 +146,88 @@ function localContextualEvaluation(
     }
   }
 
+  // 3. STAFF DAVID
   if (speaker.id === 'staff_david') {
-    // Airport Staff David
-    if (lower.includes('gate 18') || lower.includes('where') || lower.includes('san francisco') || lower.includes('sfo') || lower.includes('change')) {
-      let alt: string | undefined;
-      if (lower.includes('where is gate') || lower.includes('i want to know')) {
-        alt = "Excuse me, which way is Gate 18?";
-      }
-
+    if (lower.includes('gate 18') || lower.includes('where is') || lower.includes('which way')) {
       return {
         understood: true,
         npcReply: "Yeah, Gate 18 is down the hall on your left past the lounge. Look for the signs for Gates 15–20.",
-        naturalAlternative: alt,
+        naturalAlternative: "Excuse me, which way is Gate 18?",
         xpGain: 25,
         matchedOption: naturalOpt,
-        completesGoalId: 'obj_find_new_gate',
         nextDialogNodeId: naturalOpt.nextDialogNodeId,
       };
     }
-  }
 
-  if (speaker.id === 'passenger_elena') {
-    // Passenger Elena
-    if (lower.includes('gate') || lower.includes('18') || lower.includes('flight') || lower.includes('announcement')) {
+    if (lower.includes('cancel') || lower.includes('where') || lower.includes('help')) {
       return {
         understood: true,
-        npcReply: "Yeah, Gate 18! It's in the west wing. We'd better hurry, boarding has already started!",
-        naturalAlternative: isQuestion ? undefined : "Did they just say Gate 18?",
+        npcReply: "Passenger service is right past the information desk at Counter B.",
+        naturalAlternative: "Excuse me, my flight was cancelled. Where should I go?",
         xpGain: 20,
         matchedOption: naturalOpt,
-        completesGoalId: 'obj_find_new_gate',
+        completesGoalId: 'obj_figure_out',
         nextDialogNodeId: naturalOpt.nextDialogNodeId,
       };
     }
   }
 
-  if (speaker.id === 'agent_alex') {
-    // Gate Agent Alex
-    if (lower.includes('phone') || lower.includes('pass') || lower.includes('ticket') || lower.includes('error') || lower.includes('board')) {
-      let alt: string | undefined;
-      if (lower.includes('my phone cannot') || lower.includes('phone no work')) {
-        alt = "My phone's having trouble loading my boarding pass.";
-      }
-
+  // 4. PASSENGER ELENA
+  if (speaker.id === 'passenger_elena') {
+    if (lower.includes('gate 18') || lower.includes('move') || lower.includes('change')) {
       return {
         understood: true,
-        npcReply: "No worries at all. Let me print a physical pass for you... There you go! You're all set to board.",
-        naturalAlternative: alt,
-        xpGain: 35,
+        npcReply: "Yeah, Gate 18! It's in the west wing. We'd better hurry, boarding has started!",
+        naturalAlternative: "Did they just say our flight changed to Gate 18?",
+        xpGain: 20,
         matchedOption: naturalOpt,
-        completesGoalId: 'obj_boarding_pass',
-        nextDialogNodeId: naturalOpt.nextDialogNodeId || 'agent_alex_finished',
+        nextDialogNodeId: naturalOpt.nextDialogNodeId,
+      };
+    }
+
+    if (lower.includes('error') || lower.includes('pass') || lower.includes('ticket') || lower.includes('alex')) {
+      return {
+        understood: true,
+        npcReply: "Just ask Alex at the podium! He printed a paper pass for me in thirty seconds.",
+        naturalAlternative: "Is your boarding pass giving you an error too?",
+        xpGain: 20,
+        matchedOption: naturalOpt,
+        nextDialogNodeId: naturalOpt.nextDialogNodeId,
+      };
+    }
+
+    if (lower.includes('flight') || lower.includes('cancel') || lower.includes('help') || lower.includes('where')) {
+      return {
+        understood: true,
+        npcReply: "I just spoke with Sarah at Counter B. She's rebooking everyone onto later flights right now!",
+        naturalAlternative: "Were you on that flight too? Do you know what we should do?",
+        xpGain: 20,
+        matchedOption: naturalOpt,
+        completesGoalId: 'obj_figure_out',
+        nextDialogNodeId: naturalOpt.nextDialogNodeId,
       };
     }
   }
 
-  // Fallback for general inputs
+  // 5. GATE AGENT ALEX
+  if (speaker.id === 'agent_alex') {
+    if (lower.includes('phone') || lower.includes('pass') || lower.includes('ticket') || lower.includes('error') || lower.includes('scan') || lower.includes('board')) {
+      return {
+        understood: true,
+        npcReply: "No worries at all. Let me look up your reservation... Found you! Here is your verified boarding pass. You're all set to board.",
+        naturalAlternative: "The scanner won't recognize my digital boarding pass.",
+        xpGain: 35,
+        matchedOption: naturalOpt,
+        completesGoalId: 'obj_resolve_boarding_issue',
+        nextDialogNodeId: 'agent_alex_finished',
+      };
+    }
+  }
+
+  // Fallback for general inputs: always understand meaning without punishing grammar
   return {
     understood: true,
-    npcReply: `Got it. Let me help you with that.`,
+    npcReply: `Got it. Let me take care of that for you.`,
     xpGain: 15,
     matchedOption: acceptableOpt,
     nextDialogNodeId: acceptableOpt.nextDialogNodeId,
@@ -178,8 +236,9 @@ function localContextualEvaluation(
 }
 
 /**
- * Evaluates the player's free English response using Gemini if available,
- * or the contextual engine. Always responds as the NPC FIRST!
+ * Evaluates player's free English response using Gemini if available,
+ * or the contextual engine. Always responds as the NPC in natural spoken English.
+ * Does not interrupt gameplay or issue grammar penalties.
  */
 export async function evaluatePlayerFreeResponse(
   playerInput: string,
@@ -203,15 +262,15 @@ ${dialogNode.options.map((o, i) => `${i + 1}. "${o.englishText}"`).join('\n')}
 
 The player freely typed this response to you: "${playerInput}"
 
-Requirements:
-1. Respond AS "${speaker.name}" FIRST in natural, casual spoken English (1-2 short sentences). Keep the character's tone (${speaker.mood || 'helpful and friendly'}).
-2. If the English was slightly unnatural, textbook-like, or overly formal, suggest a more native/natural alternative in "naturalAlternative".
-3. Evaluate if the player's meaning was understood and appropriate.
+Rules:
+1. Respond AS "${speaker.name}" in natural, friendly spoken English (1-2 conversational sentences).
+2. Prioritize understanding their meaning. Even if their grammar is imperfect or broken, understand their intent!
+3. If they asked or said something slightly awkward or unnatural, provide a gentle "naturalAlternative" showing how a native speaker might say it.
 4. Output strict JSON with keys:
-- "understood": boolean
-- "npcReply": string (your in-character response to what they said)
-- "naturalAlternative": string or null (a more colloquial, native alternative if applicable)
-- "toneQuality": "natural" | "acceptable" | "inappropriate"`;
+- "understood": true
+- "npcReply": string (your in-character response)
+- "naturalAlternative": string or null
+- "toneQuality": "natural" | "acceptable"`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
@@ -225,7 +284,7 @@ Requirements:
     if (text) {
       const parsed = JSON.parse(text);
       return {
-        understood: parsed.understood !== false,
+        understood: true,
         npcReply: parsed.npcReply || localResult.npcReply,
         naturalAlternative: parsed.naturalAlternative || localResult.naturalAlternative,
         xpGain: parsed.toneQuality === 'natural' ? 30 : 20,
